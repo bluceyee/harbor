@@ -1,11 +1,15 @@
 @import '../mixin';
 
 .rightPos{
-    @include grid-left-top-pos;
+    @include grid-right-top-pos;
 }
 
 .toolbar {
     overflow: hidden;
+}
+
+.download-link {
+    font-size: 14px;
 }
 
 .filter-divider {
@@ -74,4 +78,12 @@
     height: 24px;
     width: 24px;
     margin-right: 12px;
+}
+
+.position-relative {
+    position: relative;
+}
+
+.push-image-button {
+    display: inline-block;
 }

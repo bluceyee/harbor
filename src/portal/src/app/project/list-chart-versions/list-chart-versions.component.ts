@@ -21,7 +21,6 @@ export class ListChartVersionsComponent implements OnInit {
   roleName: string;
 
   hasSignedIn: boolean;
-  hasProjectAdminRole: boolean;
   currentUser: SessionUser;
 
   constructor(
@@ -38,7 +37,6 @@ export class ListChartVersionsComponent implements OnInit {
     let resolverData = this.route.snapshot.data;
     if (resolverData) {
       let project = <Project>(resolverData["projectResolver"]);
-      this.hasProjectAdminRole = project.has_project_admin_role;
       this.roleName = project.role_name;
       this.projectName = project.name;
     }

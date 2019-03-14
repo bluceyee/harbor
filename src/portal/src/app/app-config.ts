@@ -29,6 +29,7 @@ export class AppConfig {
     registry_storage_provider_name: string;
     read_only: boolean;
     with_chartmuseum: boolean;
+    show_popular_repo: boolean;
 
     constructor() {
         // Set default value
@@ -41,7 +42,7 @@ export class AppConfig {
         this.project_creation_restriction = "everyone";
         this.self_registration = true;
         this.has_ca_root = false;
-        this.harbor_version = "1.2.0";
+        this.harbor_version = "unknown";
         this.clair_vulnerability_status = {
             overall_last_update: 0,
             details: []
@@ -50,5 +51,6 @@ export class AppConfig {
         this.registry_storage_provider_name = "";
         this.read_only = false;
         this.with_chartmuseum = false;
+        this.show_popular_repo = false;
     }
 }

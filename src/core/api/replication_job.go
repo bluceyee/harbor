@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	common_http "github.com/goharbor/harbor/src/common/http"
 	common_job "github.com/goharbor/harbor/src/common/job"
 	"github.com/goharbor/harbor/src/common/models"
+	"github.com/goharbor/harbor/src/common/rbac"
 	"github.com/goharbor/harbor/src/common/utils/log"
 	api_models "github.com/goharbor/harbor/src/core/api/models"
 	"github.com/goharbor/harbor/src/core/utils"
@@ -80,7 +81,8 @@ func (ra *RepJobAPI) List() {
 		return
 	}
 
-	if !ra.SecurityCtx.HasAllPerm(policy.ProjectIDs[0]) {
+	resource := rbac.NewProjectNamespace(policy.ProjectIDs[0]).Resource(rbac.ResourceReplicationJob)
+	if !ra.SecurityCtx.Can(rbac.ActionList, resource) {
 		ra.HandleForbidden(ra.SecurityCtx.GetUsername())
 		return
 	}
@@ -94,6 +96,7 @@ func (ra *RepJobAPI) List() {
 
 	query.Repository = ra.GetString("repository")
 	query.Statuses = ra.GetStrings("status")
+	query.OpUUID = ra.GetString("op_uuid")
 
 	startTimeStr := ra.GetString("start_time")
 	if len(startTimeStr) != 0 {
@@ -189,7 +192,8 @@ func (ra *RepJobAPI) GetLog() {
 		return
 	}
 
-	if !ra.SecurityCtx.HasAllPerm(policy.ProjectIDs[0]) {
+	resource := rbac.NewProjectNamespace(policy.ProjectIDs[0]).Resource(rbac.ResourceReplicationJob)
+	if !ra.SecurityCtx.Can(rbac.ActionRead, resource) {
 		ra.HandleForbidden(ra.SecurityCtx.GetUsername())
 		return
 	}

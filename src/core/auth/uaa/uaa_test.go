@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import (
 	"github.com/goharbor/harbor/src/common/dao"
 	"github.com/goharbor/harbor/src/common/models"
 	"github.com/goharbor/harbor/src/common/utils/test"
-	utilstest "github.com/goharbor/harbor/src/common/utils/test"
 	"github.com/goharbor/harbor/src/common/utils/uaa"
 	"github.com/goharbor/harbor/src/core/config"
 	"github.com/stretchr/testify/assert"
@@ -29,16 +28,7 @@ import (
 
 func TestMain(m *testing.M) {
 	test.InitDatabaseFromEnv()
-	server, err := utilstest.NewAdminserver(nil)
-	if err != nil {
-		panic(err)
-	}
-	defer server.Close()
-
-	if err := os.Setenv("ADMINSERVER_URL", server.URL); err != nil {
-		panic(err)
-	}
-	err = config.Init()
+	err := config.Init()
 	if err != nil {
 		panic(err)
 	}

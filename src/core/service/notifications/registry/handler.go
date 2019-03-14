@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -106,6 +106,10 @@ func (n *NotificationHandler) Post() {
 					log.Errorf("Error happens when adding repository: %v", err)
 				}
 			}()
+			if !coreutils.WaitForManifestReady(repository, tag, 5) {
+				log.Errorf("Manifest for image %s:%s is not ready, skip the follow up actions.", repository, tag)
+				return
+			}
 
 			go func() {
 				image := repository + ":" + tag
@@ -124,7 +128,7 @@ func (n *NotificationHandler) Post() {
 				if err != nil {
 					log.Errorf("Failed to get last update from Clair DB, error: %v, the auto scan will be skipped.", err)
 				} else if last == 0 {
-					log.Infof("The Vulnerability data is not ready in Clair DB, the auto scan will be skipped.", err)
+					log.Infof("The Vulnerability data is not ready in Clair DB, the auto scan will be skipped, error %v", err)
 				} else if err := coreutils.TriggerImageScan(repository, tag); err != nil {
 					log.Warningf("Failed to scan image, repository: %s, tag: %s, error: %v", repository, tag, err)
 				}
@@ -158,23 +162,26 @@ func filterEvents(notification *models.Notification) ([]*models.Event, error) {
 			continue
 		}
 
-		// pull and push manifest by docker-client or vic
-		if (strings.HasPrefix(event.Request.UserAgent, "docker") || strings.HasPrefix(event.Request.UserAgent, vicPrefix)) &&
-			(event.Action == "pull" || event.Action == "push") {
+		if checkEvent(&event) {
 			events = append(events, &event)
-			log.Debugf("add event to collect: %s", event.ID)
-			continue
-		}
-
-		// push manifest by docker-client or job-service
-		if strings.ToLower(strings.TrimSpace(event.Request.UserAgent)) == "harbor-registry-client" && event.Action == "push" {
-			events = append(events, &event)
-			log.Debugf("add event to collect: %s", event.ID)
+			log.Debugf("add event to collection: %s", event.ID)
 			continue
 		}
 	}
 
 	return events, nil
+}
+
+func checkEvent(event *models.Event) bool {
+	// pull and push manifest
+	if strings.ToLower(strings.TrimSpace(event.Request.UserAgent)) != "harbor-registry-client" && (event.Action == "pull" || event.Action == "push") {
+		return true
+	}
+	// push manifest by job-service
+	if strings.ToLower(strings.TrimSpace(event.Request.UserAgent)) == "harbor-registry-client" && event.Action == "push" {
+		return true
+	}
+	return false
 }
 
 func autoScanEnabled(project *models.Project) bool {

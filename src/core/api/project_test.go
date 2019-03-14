@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ var addProject *apilib.ProjectReq
 var addPID int
 
 func InitAddPro() {
-	addProject = &apilib.ProjectReq{"add_project", map[string]string{models.ProMetaPublic: "true"}}
+	addProject = &apilib.ProjectReq{ProjectName: "add_project", Metadata: map[string]string{models.ProMetaPublic: "true"}}
 }
 
 func TestAddProject(t *testing.T) {
@@ -82,7 +82,7 @@ func TestAddProject(t *testing.T) {
 	// case 4: response code = 400 : Project name is illegal in length
 	fmt.Println("case 4 : response code = 400 : Project name is illegal in length ")
 
-	result, err = apiTest.ProjectsPost(*admin, apilib.ProjectReq{"t", map[string]string{models.ProMetaPublic: "true"}})
+	result, err = apiTest.ProjectsPost(*admin, apilib.ProjectReq{ProjectName: "t", Metadata: map[string]string{models.ProMetaPublic: "true"}})
 	if err != nil {
 		t.Error("Error while creat project", err.Error())
 		t.Log(err)

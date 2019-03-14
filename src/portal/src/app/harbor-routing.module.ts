@@ -17,12 +17,12 @@ import { RouterModule, Routes } from '@angular/router';
 import { SystemAdminGuard } from './shared/route/system-admin-activate.service';
 import { AuthCheckGuard } from './shared/route/auth-user-activate.service';
 import { SignInGuard } from './shared/route/sign-in-guard-activate.service';
-import { LeavingConfigRouteDeactivate } from './shared/route/leaving-config-deactivate.service';
 import { MemberGuard } from './shared/route/member-guard-activate.service';
 
 import { PageNotFoundComponent } from './shared/not-found/not-found.component';
 import { HarborShellComponent } from './base/harbor-shell/harbor-shell.component';
 import { ConfigurationComponent } from './config/config.component';
+import { DevCenterComponent } from './dev-center/dev-center.component';
 
 import { UserComponent } from './user/user.component';
 import { SignInComponent } from './account/sign-in/sign-in.component';
@@ -44,7 +44,8 @@ import { LeavingRepositoryRouteDeactivate } from './shared/route/leaving-reposit
 import { ProjectComponent } from './project/project.component';
 import { ProjectDetailComponent } from './project/project-detail/project-detail.component';
 import { MemberComponent } from './project/member/member.component';
-import {ProjectLabelComponent} from "./project/project-label/project-label.component";
+import { RobotAccountComponent } from './project/robot-account/robot-account.component';
+import { ProjectLabelComponent } from "./project/project-label/project-label.component";
 import { ProjectConfigComponent } from './project/project-config/project-config.component';
 import { ProjectRoutingResolver } from './project/project-routing-resolver.service';
 import { ListChartsComponent } from './project/list-charts/list-charts.component';
@@ -54,6 +55,10 @@ import { ChartDetailComponent } from './project/chart-detail/chart-detail.compon
 const harborRoutes: Routes = [
   { path: '', redirectTo: 'harbor', pathMatch: 'full' },
   { path: 'reset_password', component: ResetPasswordComponent },
+  {
+    path: 'devcenter',
+    component: DevCenterComponent
+  },
   {
     path: 'harbor',
     component: HarborShellComponent,
@@ -174,14 +179,17 @@ const harborRoutes: Routes = [
           {
             path: 'configs',
             component: ProjectConfigComponent
+          },
+          {
+            path: 'robot-account',
+            component: RobotAccountComponent
           }
         ]
       },
       {
         path: 'configs',
         component: ConfigurationComponent,
-        canActivate: [SystemAdminGuard],
-        canDeactivate: [LeavingConfigRouteDeactivate]
+        canActivate: [SystemAdminGuard]
       },
       {
         path: 'registry',
@@ -196,7 +204,7 @@ const harborRoutes: Routes = [
 
 @NgModule({
   imports: [
-    RouterModule.forRoot(harborRoutes)
+    RouterModule.forRoot(harborRoutes, {onSameUrlNavigation: 'reload'})
   ],
   exports: [RouterModule]
 })

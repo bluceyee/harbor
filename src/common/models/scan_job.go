@@ -115,7 +115,7 @@ type VulnerabilityItem struct {
 // ScanAllPolicy is represent the json request and object for scan all policy, the parm is het
 type ScanAllPolicy struct {
 	Type string                 `json:"type"`
-	Parm map[string]interface{} `json:"parameter, omitempty"`
+	Parm map[string]interface{} `json:"parameter,omitempty"`
 }
 
 const (
@@ -131,8 +131,5 @@ const (
 
 // DefaultScanAllPolicy ...
 var DefaultScanAllPolicy = ScanAllPolicy{
-	Type: ScanAllDaily,
-	Parm: map[string]interface{}{
-		ScanAllDailyTime: 0,
-	},
+	Type: ScanAllNone,
 }

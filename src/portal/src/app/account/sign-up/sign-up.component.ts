@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 import { Component, Output, ViewChild, EventEmitter } from '@angular/core';
-import { Modal } from '@clr/angular';
+import { Modal } from '../../../../lib/src/service/interface';
 
 import { NewUserFormComponent } from '../../shared/new-user-form/new-user-form.component';
 import { User } from '../../user/user';
@@ -23,7 +23,8 @@ import { InlineAlertComponent } from '../../shared/inline-alert/inline-alert.com
 
 @Component({
     selector: 'sign-up',
-    templateUrl: "sign-up.component.html"
+    templateUrl: "sign-up.component.html",
+    styleUrls: ['../../common.scss']
 })
 export class SignUpComponent {
     opened: boolean = false;

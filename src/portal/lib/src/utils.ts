@@ -3,7 +3,7 @@ import { Observable } from "rxjs";
 import { RequestOptions, Headers } from '@angular/http';
 import { RequestQueryParams } from './service/RequestQueryParams';
 import { DebugElement } from '@angular/core';
-import { Comparator, State } from '@clr/angular';
+import { Comparator, State } from './service/interface';
 
 /**
  * Convert the different async channels to the Promise<T> type.
@@ -34,7 +34,7 @@ export const DEFAULT_LANG_COOKIE_KEY = 'harbor-lang';
 /**
  * Declare what languages are supported now.
  */
-export const DEFAULT_SUPPORTING_LANGS = ['en-us', 'zh-cn', 'es-es', 'fr-fr'];
+export const DEFAULT_SUPPORTING_LANGS = ['en-us', 'zh-cn', 'es-es', 'fr-fr', 'pt-br'];
 
 /**
  * The default language.
@@ -54,6 +54,14 @@ export const HTTP_GET_OPTIONS: RequestOptions = new RequestOptions({
         "Accept": 'application/json',
         "Cache-Control": 'no-cache',
         "Pragma": 'no-cache'
+    })
+});
+export const HTTP_GET_OPTIONS_CACHE: RequestOptions = new RequestOptions({
+    headers: new Headers({
+        "Content-Type": 'application/json',
+        "Accept": 'application/json',
+        "Cache-Control": 'no-cache',
+        "Pragma": 'no-cache',
     })
 });
 
@@ -295,6 +303,10 @@ export function clone(srcObj: any): any {
     return JSON.parse(JSON.stringify(srcObj));
 }
 
+export function isEmpty(obj: any): boolean {
+    return !obj || JSON.stringify(obj) === '{}';
+}
+
 export function downloadFile(fileData) {
     let url = window.URL.createObjectURL(fileData.data);
         let a = document.createElement("a");
@@ -305,4 +317,29 @@ export function downloadFile(fileData) {
         a.click();
         window.URL.revokeObjectURL(url);
         a.remove();
+}
+
+export function getChanges(original: any, afterChange: any): { [key: string]: any | any[] } {
+    let changes: { [key: string]: any | any[] } = {};
+    if (!afterChange || !original) {
+        return changes;
+    }
+    for (let prop of Object.keys(afterChange)) {
+        let field = original[prop];
+        if (field && field.editable) {
+            if (!compareValue(field.value, afterChange[prop].value)) {
+                changes[prop] = afterChange[prop].value;
+                // Number
+                if (typeof field.value === 'number') {
+                    changes[prop] = +changes[prop];
+                }
+
+                // Trim string value
+                if (typeof field.value === 'string') {
+                    changes[prop] = ('' + changes[prop]).trim();
+                }
+            }
+        }
+    }
+    return changes;
 }

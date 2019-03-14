@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -94,7 +94,10 @@ func TriggerImageScan(repository string, tag string) error {
 	if err != nil {
 		return err
 	}
-	digest, _, err := repoClient.ManifestExist(tag)
+	digest, exist, err := repoClient.ManifestExist(tag)
+	if !exist {
+		return fmt.Errorf("unable to perform scan: the manifest of image %s:%s does not exist", repository, tag)
+	}
 	if err != nil {
 		log.Errorf("Failed to get Manifest for %s:%s", repository, tag)
 		return err
@@ -126,7 +129,7 @@ func triggerImageScan(repository, tag, digest string, client job.Client) error {
 	}
 	err = dao.SetScanJobUUID(id, uuid)
 	if err != nil {
-		log.Warningf("Failed to set UUID for scan job, ID: %d, repository: %s, tag: %s", id, uuid, repository, tag)
+		log.Warningf("Failed to set UUID for scan job, ID: %d, UUID: %v, repository: %s, tag: %s", id, uuid, repository, tag)
 	}
 	return nil
 }

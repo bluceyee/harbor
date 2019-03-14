@@ -20,7 +20,7 @@ import {
   OnDestroy,
   EventEmitter
 } from "@angular/core";
-import { Comparator, State } from "@clr/angular";
+import { Comparator, State } from "../service/interface";
 import { Subscription, forkJoin, timer} from "rxjs";
 
 
@@ -46,8 +46,6 @@ import {
   doSorting,
   calculatePage
 } from "../utils";
-
-import { JobLogViewerComponent } from "../job-log-viewer/index";
 
 import {
   ConfirmationTargets,
@@ -106,6 +104,10 @@ export class ReplicationComponent implements OnInit, OnDestroy {
   @Input() isSystemAdmin: boolean;
   @Input() withAdmiral: boolean;
   @Input() withReplicationJob: boolean;
+  @Input() hasCreateReplicationPermission: boolean;
+  @Input() hasUpdateReplicationPermission: boolean;
+  @Input() hasDeleteReplicationPermission: boolean;
+  @Input() hasExecuteReplicationPermission: boolean;
 
   @Output() redirect = new EventEmitter<ReplicationRule>();
   @Output() openCreateRule = new EventEmitter<any>();
@@ -138,8 +140,6 @@ export class ReplicationComponent implements OnInit, OnDestroy {
   @ViewChild(CreateEditRuleComponent)
   createEditPolicyComponent: CreateEditRuleComponent;
 
-  @ViewChild("replicationLogViewer")
-  replicationLogViewer: JobLogViewerComponent;
 
   @ViewChild("replicationConfirmDialog")
   replicationConfirmDialog: ConfirmationDialogComponent;
@@ -454,9 +454,7 @@ export class ReplicationComponent implements OnInit, OnDestroy {
     this.loadFirstPage();
   }
 
-  viewLog(jobId: number | string): void {
-    if (this.replicationLogViewer) {
-      this.replicationLogViewer.open(jobId);
-    }
+  viewLog(jobId: number | string): string {
+    return this.replicationService.getJobBaseUrl() + "/" + jobId + "/log";
   }
 }

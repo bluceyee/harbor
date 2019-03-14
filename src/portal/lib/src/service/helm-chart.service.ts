@@ -113,26 +113,6 @@ export class HelmChartDefaultService extends HelmChartService {
     return res.json() || [];
   }
 
-  private extractHelmItems(res: Response) {
-    if (res.text() === "") {
-      return [];
-    }
-    let charts = res.json();
-    if (charts) {
-      return charts.map( chart => {
-        return {
-          name: chart.Name,
-          total_versions: chart.total_versions,
-          latest_version: chart.latest_version,
-          created: chart.Created,
-          icon: chart.Icon,
-          home: chart.Home};
-      });
-    } else {
-      return [];
-    }
-  }
-
   private handleErrorObservable(error: HttpErrorResponse) {
     return observableThrowError(error.message || error);
   }
@@ -146,12 +126,10 @@ export class HelmChartDefaultService extends HelmChartService {
 
     return this.http
       .get(`${this.config.helmChartEndpoint}/${projectName}/charts`, HTTP_GET_OPTIONS)
-      .pipe(map(response => {
-         return this.extractHelmItems(response);
-      }))
-      .pipe(catchError(error => {
-        return this.handleErrorObservable(error);
-      }));
+      .pipe(
+        map(response => this.extractData(response),
+        catchError(error => this.handleErrorObservable(error))
+      ));
   }
 
   public deleteHelmChart(projectId: number | string, chartName: string): Observable<any> {
@@ -172,10 +150,10 @@ export class HelmChartDefaultService extends HelmChartService {
     chartName: string,
   ): Observable<HelmChartVersion[]> {
     return this.http.get(`${this.config.helmChartEndpoint}/${projectName}/charts/${chartName}`, HTTP_GET_OPTIONS)
-    .pipe(map(response => {
-      return this.extractData(response);
-    }))
-    .pipe(catchError(this.handleErrorObservable));
+    .pipe(
+      map(response => this.extractData(response)),
+      catchError(this.handleErrorObservable)
+    );
   }
 
   public deleteChartVersion(projectName: string, chartName: string, version: string): any {

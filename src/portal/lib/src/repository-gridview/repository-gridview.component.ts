@@ -8,13 +8,14 @@ import {
     ChangeDetectorRef,
     EventEmitter,
     OnChanges,
-    SimpleChanges
+    SimpleChanges,
+    Inject
 } from "@angular/core";
 import { Router } from "@angular/router";
 import { forkJoin } from "rxjs";
 import { finalize } from "rxjs/operators";
-import {TranslateService} from "@ngx-translate/core";
-import {Comparator, State} from "@clr/angular";
+import { TranslateService } from "@ngx-translate/core";
+import { Comparator, State } from "../service/interface";
 
 import {
     Repository,
@@ -25,17 +26,19 @@ import {
     RepositoryItem,
     TagService
 } from '../service/index';
-import {ErrorHandler} from '../error-handler/error-handler';
-import {toPromise, CustomComparator, DEFAULT_PAGE_SIZE, calculatePage, doFiltering, doSorting, clone} from '../utils';
-import {ConfirmationState, ConfirmationTargets, ConfirmationButtons} from '../shared/shared.const';
-import {ConfirmationDialogComponent} from '../confirmation-dialog/confirmation-dialog.component';
-import {ConfirmationMessage} from '../confirmation-dialog/confirmation-message';
-import {ConfirmationAcknowledgement} from '../confirmation-dialog/confirmation-state-message';
-import {Tag} from '../service/interface';
-import {GridViewComponent} from '../gridview/grid-view.component';
-import {OperationService} from "../operation/operation.service";
-import {OperateInfo, OperationState, operateChanges} from "../operation/operate";
-
+import { ErrorHandler } from '../error-handler/error-handler';
+import { toPromise, CustomComparator, DEFAULT_PAGE_SIZE, calculatePage, doFiltering, doSorting, clone } from '../utils';
+import { ConfirmationState, ConfirmationTargets, ConfirmationButtons } from '../shared/shared.const';
+import { ConfirmationDialogComponent } from '../confirmation-dialog/confirmation-dialog.component';
+import { ConfirmationMessage } from '../confirmation-dialog/confirmation-message';
+import { ConfirmationAcknowledgement } from '../confirmation-dialog/confirmation-state-message';
+import { Tag } from '../service/interface';
+import { GridViewComponent } from '../gridview/grid-view.component';
+import { OperationService } from "../operation/operation.service";
+import { UserPermissionService } from "../service/permission.service";
+import { USERSTATICPERMISSION } from "../service/permission-static";
+import { OperateInfo, OperationState, operateChanges } from "../operation/operate";
+import { SERVICE_CONFIG, IServiceConfig } from '../service.config';
 @Component({
     selector: "hbr-repository-gridview",
     templateUrl: "./repository-gridview.component.html",
@@ -44,6 +47,7 @@ import {OperateInfo, OperationState, operateChanges} from "../operation/operate"
 })
 export class RepositoryGridviewComponent implements OnChanges, OnInit {
     signedCon: { [key: string]: any | string[] } = {};
+    downloadLink: string;
     @Input() projectId: number;
     @Input() projectName = "unknown";
     @Input() urlPrefix: string;
@@ -77,15 +81,21 @@ export class RepositoryGridviewComponent implements OnChanges, OnInit {
     confirmationDialog: ConfirmationDialogComponent;
 
     @ViewChild("gridView") gridView: GridViewComponent;
-
-    constructor(private errorHandler: ErrorHandler,
-                private translateService: TranslateService,
-                private repositoryService: RepositoryService,
-                private systemInfoService: SystemInfoService,
-                private tagService: TagService,
-                private operationService: OperationService,
-                private ref: ChangeDetectorRef,
-                private router: Router) {
+    hasCreateRepositoryPermission: boolean;
+    hasDeleteRepositoryPermission: boolean;
+    constructor(@Inject(SERVICE_CONFIG) private configInfo: IServiceConfig,
+        private errorHandler: ErrorHandler,
+        private translateService: TranslateService,
+        private repositoryService: RepositoryService,
+        private systemInfoService: SystemInfoService,
+        private tagService: TagService,
+        private operationService: OperationService,
+        public userPermissionService: UserPermissionService,
+        private ref: ChangeDetectorRef,
+        private router: Router) {
+        if (this.configInfo && this.configInfo.systemInfoEndpoint) {
+            this.downloadLink = this.configInfo.systemInfoEndpoint + "/getcert";
+        }
     }
 
     public get registryUrl(): string {
@@ -112,6 +122,10 @@ export class RepositoryGridviewComponent implements OnChanges, OnInit {
         return this.withClair && !this.isClairDBReady;
     }
 
+    get canDownloadCert(): boolean {
+        return this.systemInfo && this.systemInfo.has_ca_root;
+    }
+
     ngOnChanges(changes: SimpleChanges): void {
         if (changes["projectId"] && changes["projectId"].currentValue) {
             this.refresh();
@@ -131,6 +145,7 @@ export class RepositoryGridviewComponent implements OnChanges, OnInit {
         }
 
         this.lastFilteredRepoName = "";
+        this.getHelmChartVersionPermission(this.projectId);
     }
 
     confirmDeletion(message: ConfirmationAcknowledgement) {
@@ -171,8 +186,8 @@ export class RepositoryGridviewComponent implements OnChanges, OnInit {
         if (this.signedCon[repo.name].length !== 0) {
             forkJoin(this.translateService.get('BATCH.DELETED_FAILURE'),
                 this.translateService.get('REPOSITORY.DELETION_TITLE_REPO_SIGNED')).subscribe(res => {
-                operateChanges(operMessage, OperationState.failure, res[1]);
-            });
+                    operateChanges(operMessage, OperationState.failure, res[1]);
+                });
         } else {
             return toPromise<number>(this.repositoryService
                 .deleteRepository(repo.name))
@@ -182,24 +197,24 @@ export class RepositoryGridviewComponent implements OnChanges, OnInit {
                             operateChanges(operMessage, OperationState.success);
                         });
                     }).catch(error => {
-                    if (error.status === "412") {
-                        forkJoin(this.translateService.get('BATCH.DELETED_FAILURE'),
-                            this.translateService.get('REPOSITORY.TAGS_SIGNED')).subscribe(res => {
-                            operateChanges(operMessage, OperationState.failure, res[1]);
+                        if (error.status === "412") {
+                            forkJoin(this.translateService.get('BATCH.DELETED_FAILURE'),
+                                this.translateService.get('REPOSITORY.TAGS_SIGNED')).subscribe(res => {
+                                    operateChanges(operMessage, OperationState.failure, res[1]);
+                                });
+                            return;
+                        }
+                        if (error.status === 503) {
+                            forkJoin(this.translateService.get('BATCH.DELETED_FAILURE'),
+                                this.translateService.get('REPOSITORY.TAGS_NO_DELETE')).subscribe(res => {
+                                    operateChanges(operMessage, OperationState.failure, res[1]);
+                                });
+                            return;
+                        }
+                        this.translateService.get('BATCH.DELETED_FAILURE').subscribe(res => {
+                            operateChanges(operMessage, OperationState.failure, res);
                         });
-                        return;
-                    }
-                    if (error.status === 503) {
-                        forkJoin(this.translateService.get('BATCH.DELETED_FAILURE'),
-                            this.translateService.get('REPOSITORY.TAGS_NO_DELETE')).subscribe(res => {
-                            operateChanges(operMessage, OperationState.failure, res[1]);
-                        });
-                        return;
-                    }
-                    this.translateService.get('BATCH.DELETED_FAILURE').subscribe(res => {
-                        operateChanges(operMessage, OperationState.failure, res);
                     });
-                });
         }
     }
 
@@ -207,8 +222,8 @@ export class RepositoryGridviewComponent implements OnChanges, OnInit {
         this.lastFilteredRepoName = repoName;
         this.currentPage = 1;
         let st: State = this.currentState;
-        if (!st) {
-            st = {page: {}};
+        if (!st || !st.page) {
+            st = { page: {} };
         }
         st.page.size = this.pageSize;
         st.page.from = 0;
@@ -288,8 +303,8 @@ export class RepositoryGridviewComponent implements OnChanges, OnInit {
         return toPromise<Tag[]>(this.tagService.getTags(repo.name))
             .then(items => {
                 if (items.some((t: Tag) => {
-                        return t.name === 'latest';
-                    })) {
+                    return t.name === 'latest';
+                })) {
                     return true;
                 } else {
                     return false;
@@ -376,6 +391,9 @@ export class RepositoryGridviewComponent implements OnChanges, OnInit {
     }
 
     clrLoad(state: State): void {
+        if (!state || !state.page) {
+            return;
+        }
         this.selectedRow = [];
         // Keep it for future filtering and sorting
         this.currentState = state;
@@ -438,7 +456,7 @@ export class RepositoryGridviewComponent implements OnChanges, OnInit {
 
         let st: State = this.currentState;
         if (!st) {
-            st = {page: {}};
+            st = { page: {} };
         }
         st.page.size = this.pageSize;
         st.page.from = (targetPageNumber - 1) * this.pageSize;
@@ -453,13 +471,6 @@ export class RepositoryGridviewComponent implements OnChanges, OnInit {
 
     getImgLink(repo: RepositoryItem): string {
         return "/container-image-icons?container-image=" + repo.name;
-    }
-
-    getRepoDescrition(repo: RepositoryItem): string {
-        if (repo && repo.description) {
-            return repo.description;
-        }
-        return "No description for this repo. You can add it to this repository.";
     }
 
     showCard(cardView: boolean) {
@@ -492,5 +503,17 @@ export class RepositoryGridviewComponent implements OnChanges, OnInit {
         } else {
             return this.listHover;
         }
+    }
+
+    getHelmChartVersionPermission(projectId: number): void {
+
+        let hasCreateRepositoryPermission = this.userPermissionService.getPermission(this.projectId,
+            USERSTATICPERMISSION.REPOSITORY.KEY, USERSTATICPERMISSION.REPOSITORY.VALUE.CREATE);
+        let hasDeleteRepositoryPermission = this.userPermissionService.getPermission(this.projectId,
+            USERSTATICPERMISSION.REPOSITORY.KEY, USERSTATICPERMISSION.REPOSITORY.VALUE.DELETE);
+        forkJoin(hasCreateRepositoryPermission, hasDeleteRepositoryPermission).subscribe(permissions => {
+            this.hasCreateRepositoryPermission = permissions[0] as boolean;
+            this.hasDeleteRepositoryPermission = permissions[1] as boolean;
+        }, error => this.errorHandler.error(error));
     }
 }

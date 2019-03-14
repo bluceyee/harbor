@@ -15,6 +15,7 @@
 package dao
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -141,6 +142,7 @@ func TestMain(m *testing.M) {
 		switch database {
 		case "postgresql":
 			PrepareTestForPostgresSQL()
+			PrepareTestData([]string{"delete from admin_job"}, []string{})
 		default:
 			log.Fatalf("invalid database: %s", database)
 		}
@@ -874,27 +876,6 @@ func TestGetRepPolicyByName(t *testing.T) {
 
 }
 
-func TestAddRepPolicy2(t *testing.T) {
-	policy2 := models.RepPolicy{
-		ProjectID:   3,
-		TargetID:    3,
-		Description: "whatever",
-		Name:        "mypolicy",
-	}
-	policyID2, err := AddRepPolicy(policy2)
-	t.Logf("added policy, id: %d", policyID2)
-	if err != nil {
-		t.Errorf("Error occurred in AddRepPolicy: %v", err)
-	}
-	p, err := GetRepPolicy(policyID2)
-	if err != nil {
-		t.Errorf("Error occurred in GetPolicy: %v, id: %d", err, policyID2)
-	}
-	if p == nil {
-		t.Errorf("Unable to find a policy with id: %d", policyID2)
-	}
-}
-
 func TestAddRepJob(t *testing.T) {
 	job := models.RepJob{
 		Repository: "library/ubuntu",
@@ -1118,12 +1099,8 @@ func TestDeleteRepPolicy(t *testing.T) {
 	}
 	t.Logf("delete rep policy, id: %d", policyID)
 	p, err := GetRepPolicy(policyID)
-	if err != nil && err != orm.ErrNoRows {
-		t.Errorf("Error occurred in GetRepPolicy:%v", err)
-	}
-	if p != nil && !p.Deleted {
-		t.Errorf("Able to find rep policy after deletion, id: %d", policyID)
-	}
+	require.Nil(t, err)
+	assert.Nil(t, p)
 }
 
 func TestGetOrmer(t *testing.T) {
@@ -1486,5 +1463,9 @@ func TestSaveConfigEntries(t *testing.T) {
 	if findItem != 3 {
 		t.Fatalf("Should update 3 configuration but only update %d", findItem)
 	}
+}
 
+func TestIsDupRecError(t *testing.T) {
+	assert.True(t, isDupRecErr(fmt.Errorf("pq: duplicate key value violates unique constraint \"properties_k_key\"")))
+	assert.False(t, isDupRecErr(fmt.Errorf("other error")))
 }

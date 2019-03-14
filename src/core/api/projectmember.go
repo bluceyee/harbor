@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,8 +22,10 @@ import (
 	"strings"
 
 	"github.com/goharbor/harbor/src/common"
+	"github.com/goharbor/harbor/src/common/dao"
 	"github.com/goharbor/harbor/src/common/dao/project"
 	"github.com/goharbor/harbor/src/common/models"
+	"github.com/goharbor/harbor/src/common/rbac"
 	"github.com/goharbor/harbor/src/common/utils/log"
 	"github.com/goharbor/harbor/src/core/auth"
 )
@@ -73,12 +75,6 @@ func (pma *ProjectMemberAPI) Prepare() {
 	}
 	pma.project = project
 
-	if !(pma.Ctx.Input.IsGet() && pma.SecurityCtx.HasReadPerm(pid) ||
-		pma.SecurityCtx.HasAllPerm(pid)) {
-		pma.HandleForbidden(pma.SecurityCtx.GetUsername())
-		return
-	}
-
 	pmid, err := pma.GetInt64FromPath(":pmid")
 	if err != nil {
 		log.Warningf("Failed to get pmid from path, error %v", err)
@@ -90,6 +86,22 @@ func (pma *ProjectMemberAPI) Prepare() {
 	pma.id = int(pmid)
 }
 
+func (pma *ProjectMemberAPI) requireAccess(action rbac.Action) bool {
+	resource := rbac.NewProjectNamespace(pma.project.ProjectID).Resource(rbac.ResourceMember)
+
+	if !pma.SecurityCtx.Can(action, resource) {
+		if !pma.SecurityCtx.IsAuthenticated() {
+			pma.HandleUnauthorized()
+		} else {
+			pma.HandleForbidden(pma.SecurityCtx.GetUsername())
+		}
+
+		return false
+	}
+
+	return true
+}
+
 // Get ...
 func (pma *ProjectMemberAPI) Get() {
 	projectID := pma.project.ProjectID
@@ -97,6 +109,9 @@ func (pma *ProjectMemberAPI) Get() {
 	queryMember.ProjectID = projectID
 	pma.Data["json"] = make([]models.Member, 0)
 	if pma.id == 0 {
+		if !pma.requireAccess(rbac.ActionList) {
+			return
+		}
 		entityname := pma.GetString("entityname")
 		memberList, err := project.SearchMemberByName(projectID, entityname)
 		if err != nil {
@@ -119,6 +134,10 @@ func (pma *ProjectMemberAPI) Get() {
 			pma.HandleNotFound(fmt.Sprintf("The project member does not exit, pmid:%v", pma.id))
 			return
 		}
+
+		if !pma.requireAccess(rbac.ActionRead) {
+			return
+		}
 		pma.Data["json"] = memberList[0]
 	}
 	pma.ServeJSON()
@@ -126,6 +145,9 @@ func (pma *ProjectMemberAPI) Get() {
 
 // Post ... Add a project member
 func (pma *ProjectMemberAPI) Post() {
+	if !pma.requireAccess(rbac.ActionCreate) {
+		return
+	}
 	projectID := pma.project.ProjectID
 	var request models.MemberReq
 	pma.DecodeJSONReq(&request)
@@ -156,11 +178,14 @@ func (pma *ProjectMemberAPI) Post() {
 
 // Put ... Update an exist project member
 func (pma *ProjectMemberAPI) Put() {
+	if !pma.requireAccess(rbac.ActionUpdate) {
+		return
+	}
 	pid := pma.project.ProjectID
 	pmID := pma.id
 	var req models.Member
 	pma.DecodeJSONReq(&req)
-	if req.Role < 1 || req.Role > 3 {
+	if req.Role < 1 || req.Role > 4 {
 		pma.HandleBadRequest(fmt.Sprintf("Invalid role id %v", req.Role))
 		return
 	}
@@ -173,6 +198,9 @@ func (pma *ProjectMemberAPI) Put() {
 
 // Delete ...
 func (pma *ProjectMemberAPI) Delete() {
+	if !pma.requireAccess(rbac.ActionDelete) {
+		return
+	}
 	pmid := pma.id
 	err := project.DeleteProjectMemberByID(pmid)
 	if err != nil {
@@ -193,10 +221,19 @@ func AddProjectMember(projectID int64, request models.MemberReq) (int, error) {
 		member.EntityID = request.MemberGroup.ID
 		member.EntityType = common.GroupMember
 	} else if len(request.MemberUser.Username) > 0 {
+		var userID int
 		member.EntityType = common.UserMember
-		userID, err := auth.SearchAndOnBoardUser(request.MemberUser.Username)
+		u, err := dao.GetUser(models.User{Username: request.MemberUser.Username})
 		if err != nil {
 			return 0, err
+		}
+		if u != nil {
+			userID = u.UserID
+		} else {
+			userID, err = auth.SearchAndOnBoardUser(request.MemberUser.Username)
+			if err != nil {
+				return 0, err
+			}
 		}
 		member.EntityID = userID
 	} else if len(request.MemberGroup.LdapGroupDN) > 0 {
@@ -226,7 +263,7 @@ func AddProjectMember(projectID int64, request models.MemberReq) (int, error) {
 		return 0, ErrDuplicateProjectMember
 	}
 
-	if member.Role < 1 || member.Role > 3 {
+	if member.Role < 1 || member.Role > 4 {
 		// Return invalid role error
 		return 0, ErrInvalidRole
 	}

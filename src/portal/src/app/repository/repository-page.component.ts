@@ -17,7 +17,6 @@ import { RepositoryItem } from '@harbor/ui';
 
 import { Project } from '../project/project';
 import { SessionService } from '../shared/session.service';
-
 @Component({
   selector: 'repository',
   templateUrl: 'repository-page.component.html'
@@ -32,7 +31,7 @@ export class RepositoryPageComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private session: SessionService,
-    private router: Router
+    private router: Router,
   ) {
   }
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,6 @@
 package models
 
 import (
-	"log"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,6 +21,9 @@ import (
 	"github.com/goharbor/harbor/src/common"
 	common_job "github.com/goharbor/harbor/src/common/job"
 	"github.com/goharbor/harbor/src/common/utils/test"
+	"github.com/goharbor/harbor/src/core/config"
+	"os"
+	"strings"
 )
 
 var adminServerTestConfig = map[string]interface{}{
@@ -29,26 +31,25 @@ var adminServerTestConfig = map[string]interface{}{
 }
 
 func TestMain(m *testing.M) {
-	server, err := test.NewAdminserver(adminServerTestConfig)
-	if err != nil {
-		log.Fatalf("failed to create a mock admin server: %v", err)
-	}
-	defer server.Close()
+
+	test.InitDatabaseFromEnv()
+	config.Init()
+	config.Upload(adminServerTestConfig)
+	os.Exit(m.Run())
 
 }
 
 func TestToJob(t *testing.T) {
 	schedule := &ScheduleParam{
-		Type:    "Daily",
-		Offtime: 200,
+		Type: "Daily",
+		Cron: "20 3 0 * * *",
 	}
 
 	adminjob := &GCReq{
 		Schedule: schedule,
 	}
 
-	job, err := adminjob.ToJob()
-	assert.Nil(t, err)
+	job := adminjob.ToJob()
 	assert.Equal(t, job.Name, "IMAGE_GC")
 	assert.Equal(t, job.Metadata.JobKind, common_job.JobKindPeriodic)
 	assert.Equal(t, job.Metadata.Cron, "20 3 0 * * *")
@@ -63,29 +64,15 @@ func TestToJobManual(t *testing.T) {
 		Schedule: schedule,
 	}
 
-	job, err := adminjob.ToJob()
-	assert.Nil(t, err)
+	job := adminjob.ToJob()
 	assert.Equal(t, job.Name, "IMAGE_GC")
 	assert.Equal(t, job.Metadata.JobKind, common_job.JobKindGeneric)
 }
 
-func TestToJobErr(t *testing.T) {
-	schedule := &ScheduleParam{
-		Type: "test",
-	}
-
-	adminjob := &GCReq{
-		Schedule: schedule,
-	}
-
-	_, err := adminjob.ToJob()
-	assert.NotNil(t, err)
-}
-
 func TestIsPeriodic(t *testing.T) {
 	schedule := &ScheduleParam{
-		Type:    "Daily",
-		Offtime: 200,
+		Type: "Daily",
+		Cron: "20 3 0 * * *",
 	}
 
 	adminjob := &GCReq{
@@ -98,8 +85,8 @@ func TestIsPeriodic(t *testing.T) {
 
 func TestJobKind(t *testing.T) {
 	schedule := &ScheduleParam{
-		Type:    "Daily",
-		Offtime: 200,
+		Type: "Daily",
+		Cron: "20 3 0 * * *",
 	}
 	adminjob := &GCReq{
 		Schedule: schedule,
@@ -119,12 +106,12 @@ func TestJobKind(t *testing.T) {
 
 func TestCronString(t *testing.T) {
 	schedule := &ScheduleParam{
-		Type:    "Daily",
-		Offtime: 102,
+		Type: "Daily",
+		Cron: "20 3 0 * * *",
 	}
 	adminjob := &GCReq{
 		Schedule: schedule,
 	}
 	cronStr := adminjob.CronString()
-	assert.Equal(t, cronStr, "{\"type\":\"Daily\",\"Weekday\":0,\"Offtime\":102}")
+	assert.True(t, strings.EqualFold(cronStr, "{\"type\":\"Daily\",\"Cron\":\"20 3 0 * * *\"}"))
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -214,7 +214,7 @@ func (gc *GCAPI) GetLog() {
 
 // submitJob submits a job to job service per request
 func (gc *GCAPI) submitJob(gr *models.GCReq) {
-	// cannot post multiple schdule for GC job.
+	// cannot post multiple schedule for GC job.
 	if gr.IsPeriodic() {
 		jobs, err := dao.GetAdminJobs(&common_models.AdminJobQuery{
 			Name: common_job.ImageGC,
@@ -243,7 +243,7 @@ func (gc *GCAPI) submitJob(gr *models.GCReq) {
 	gr.Parameters = map[string]interface{}{
 		"redis_url_reg": os.Getenv("_REDIS_URL_REG"),
 	}
-	job, err := gr.ToJob()
+	job := gr.ToJob()
 	if err != nil {
 		gc.HandleInternalServerError(fmt.Sprintf("%v", err))
 		return

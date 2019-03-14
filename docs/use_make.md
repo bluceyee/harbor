@@ -15,9 +15,8 @@ all                 | prepare env, compile binaries, build images and install im
 prepare             | prepare env
 compile             | compile ui and jobservice code
 compile_portal      | compile portal code
-compile_ui          | compile ui binary
+compile_core        | compile core binary
 compile_jobservice  | compile jobservice binary
-compile_adminserver | compile admin server binary
 build               | build Harbor docker images (default: using build_photon)
 build_photon        | build Harbor docker images from Photon OS base image
 install             | compile binaries, build images, prepare specific version of compose file and startup Harbor instance
@@ -37,10 +36,10 @@ version				 | set harbor version
 #### EXAMPLE:
 
 #### Build and run harbor from source code.
-make install GOBUILDIMAGE=golang:1.7.3 COMPILETAG=compile_golangimage NOTARYFLAG=true
+make install GOBUILDIMAGE=golang:1.11.2 COMPILETAG=compile_golangimage NOTARYFLAG=true
 
 ### Package offline installer
-make package_offline GOBUILDIMAGE=golang:1.7.3 COMPILETAG=compile_golangimage NOTARYFLAG=true
+make package_offline GOBUILDIMAGE=golang:1.11.2 COMPILETAG=compile_golangimage NOTARYFLAG=true
 
 ### Start harbor with notary
 make -e NOTARYFLAG=true start

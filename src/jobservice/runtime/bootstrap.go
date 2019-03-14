@@ -1,4 +1,16 @@
-// Copyright Project Harbor Authors. All rights reserved.
+// Copyright Project Harbor Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package runtime
 
@@ -16,12 +28,15 @@ import (
 	"github.com/goharbor/harbor/src/jobservice/config"
 	"github.com/goharbor/harbor/src/jobservice/core"
 	"github.com/goharbor/harbor/src/jobservice/env"
+	jsjob "github.com/goharbor/harbor/src/jobservice/job"
 	"github.com/goharbor/harbor/src/jobservice/job/impl"
 	"github.com/goharbor/harbor/src/jobservice/job/impl/gc"
 	"github.com/goharbor/harbor/src/jobservice/job/impl/replication"
 	"github.com/goharbor/harbor/src/jobservice/job/impl/scan"
 	"github.com/goharbor/harbor/src/jobservice/logger"
+	"github.com/goharbor/harbor/src/jobservice/models"
 	"github.com/goharbor/harbor/src/jobservice/pool"
+	"github.com/goharbor/harbor/src/jobservice/utils"
 	"github.com/gomodule/redigo/redis"
 )
 
@@ -49,11 +64,7 @@ func (bs *Bootstrap) SetJobContextInitializer(initializer env.JobContextInitiali
 
 // LoadAndRun will load configurations, initialize components and then start the related process to serve requests.
 // Return error if meet any problems.
-func (bs *Bootstrap) LoadAndRun() {
-	// Create the root context
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
+func (bs *Bootstrap) LoadAndRun(ctx context.Context, cancel context.CancelFunc) {
 	rootContext := &env.Context{
 		SystemContext: ctx,
 		WG:            &sync.WaitGroup{},
@@ -85,13 +96,15 @@ func (bs *Bootstrap) LoadAndRun() {
 
 	// Initialize controller
 	ctl := core.NewController(backendPool)
+	// Keep the job launch func in the system context
+	var launchJobFunc jsjob.LaunchJobFunc = func(req models.JobRequest) (models.JobStats, error) {
+		return ctl.LaunchJob(req)
+	}
+	rootContext.SystemContext = context.WithValue(rootContext.SystemContext, utils.CtlKeyOfLaunchJobFunc, launchJobFunc)
+
 	// Start the API server
 	apiServer := bs.loadAndRunAPIServer(rootContext, config.DefaultConfig, ctl)
 	logger.Infof("Server is started at %s:%d with %s", "", config.DefaultConfig.Port, config.DefaultConfig.Protocol)
-
-	// Start outdated log files sweeper
-	logSweeper := logger.NewSweeper(ctx, config.GetLogBasePath(), config.GetLogArchivePeriod())
-	logSweeper.Start()
 
 	// To indicate if any errors occurred
 	var err error
@@ -110,7 +123,7 @@ func (bs *Bootstrap) LoadAndRun() {
 	apiServer.Stop()
 
 	// In case stop is called before the server is ready
-	close := make(chan bool, 1)
+	closeChan := make(chan bool, 1)
 	go func() {
 		timer := time.NewTimer(10 * time.Second)
 		defer timer.Stop()
@@ -119,14 +132,14 @@ func (bs *Bootstrap) LoadAndRun() {
 		case <-timer.C:
 			// Try again
 			apiServer.Stop()
-		case <-close:
+		case <-closeChan:
 			return
 		}
 
 	}()
 
 	rootContext.WG.Wait()
-	close <- true
+	closeChan <- true
 
 	if err != nil {
 		logger.Fatalf("Server exit with error: %s\n", err)
@@ -170,6 +183,14 @@ func (bs *Bootstrap) loadAndRunRedisWorkerPool(ctx *env.Context, cfg *config.Con
 				redis.DialReadTimeout(dialReadTimeout),
 				redis.DialWriteTimeout(dialWriteTimeout),
 			)
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			if time.Since(t) < time.Minute {
+				return nil
+			}
+
+			_, err := c.Do("PING")
+			return err
 		},
 	}
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 import { Component, OnInit, Input } from '@angular/core';
-import { Comparator, State } from '@clr/angular';
+import { Comparator, State } from '../service/interface';
 
 import {
     AccessLogService,
@@ -67,6 +67,9 @@ export class RecentLogComponent implements OnInit {
     }
 
     public doFilter(terms: string): void {
+        if (!terms) {
+            return;
+        }
         this.currentTerm = terms.trim();
         // Trigger data loading and start from first page
         this.loading = true;
@@ -107,6 +110,9 @@ export class RecentLogComponent implements OnInit {
     }
 
     load(state: State) {
+        if (!state || !state.page) {
+            return;
+        }
         // Keep it for future filter
         this.currentState = state;
 
@@ -152,7 +158,6 @@ export class RecentLogComponent implements OnInit {
             this.recentLogs = doSorting<AccessLogItem>(this.recentLogs, state);
         }
     }
-
     isMatched(terms: string, log: AccessLogItem): boolean {
         let reg = new RegExp('.*' + terms + '.*', 'i');
         return reg.test(log.username) ||

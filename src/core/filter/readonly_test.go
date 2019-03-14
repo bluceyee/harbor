@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,11 +17,9 @@ package filter
 import (
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/goharbor/harbor/src/common"
-	utilstest "github.com/goharbor/harbor/src/common/utils/test"
 	"github.com/goharbor/harbor/src/core/config"
 	"github.com/stretchr/testify/assert"
 )
@@ -29,29 +27,9 @@ import (
 func TestReadonlyFilter(t *testing.T) {
 
 	var defaultConfig = map[string]interface{}{
-		common.ExtEndpoint:        "host01.com",
-		common.AUTHMode:           "db_auth",
-		common.CfgExpiration:      5,
-		common.TokenExpiration:    30,
-		common.DatabaseType:       "postgresql",
-		common.PostGreSQLDatabase: "registry",
-		common.PostGreSQLHOST:     "127.0.0.1",
-		common.PostGreSQLPort:     5432,
-		common.PostGreSQLPassword: "root123",
-		common.PostGreSQLUsername: "postgres",
-		common.ReadOnly:           true,
+		common.ReadOnly: true,
 	}
-	adminServer, err := utilstest.NewAdminserver(defaultConfig)
-	if err != nil {
-		panic(err)
-	}
-	defer adminServer.Close()
-	if err := os.Setenv("ADMINSERVER_URL", adminServer.URL); err != nil {
-		panic(err)
-	}
-	if err := config.Init(); err != nil {
-		panic(err)
-	}
+	config.Upload(defaultConfig)
 
 	assert := assert.New(t)
 	req1, _ := http.NewRequest("DELETE", "http://127.0.0.1:5000/api/repositories/library/ubuntu", nil)
@@ -79,4 +57,22 @@ func TestReadonlyFilter(t *testing.T) {
 	filter(req5, rec)
 	assert.Equal(http.StatusServiceUnavailable, rec.Code)
 
+	req6, _ := http.NewRequest("POST", "http://127.0.0.1:5000/api/repositories/library/hello-world/tags", nil)
+	rec = httptest.NewRecorder()
+	filter(req6, rec)
+	assert.Equal(http.StatusServiceUnavailable, rec.Code)
+}
+
+func TestMatchRetag(t *testing.T) {
+	req1, _ := http.NewRequest("POST", "http://127.0.0.1:5000/api/repositories/library/hello-world/tags", nil)
+	assert.True(t, matchRetag(req1))
+
+	req2, _ := http.NewRequest("POST", "http://127.0.0.1:5000/api/repositories/library/hello-world/tags/v1.0", nil)
+	assert.False(t, matchRetag(req2))
+
+	req3, _ := http.NewRequest("GET", "http://127.0.0.1:5000/api/repositories/library/hello-world/tags", nil)
+	assert.False(t, matchRetag(req3))
+
+	req4, _ := http.NewRequest("POST", "http://127.0.0.1:5000/api/repositories/library/hello-world", nil)
+	assert.False(t, matchRetag(req4))
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+
+	"github.com/goharbor/harbor/src/core/config"
 
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/models"
@@ -178,6 +180,15 @@ func TestSearch(t *testing.T) {
 	_, exist = repositories["search-2/hello-world"]
 	assert.True(t, exist)
 
+	chartSettings := map[string]interface{}{
+		common.WithChartMuseum: true,
+	}
+	config.InitWithSettings(chartSettings)
+	defer func() {
+		// reset config
+		config.Init()
+	}()
+
 	// Search chart
 	err = handleAndParse(&testingRequest{
 		method: http.MethodGet,
@@ -190,8 +201,8 @@ func TestSearch(t *testing.T) {
 		credential: sysAdmin,
 	}, result)
 	require.Nil(t, err)
-	require.Equal(t, 1, len(result.Chart))
-	require.Equal(t, "library/harbor", result.Chart[0].Name)
+	require.Equal(t, 1, len(*(result.Chart)))
+	require.Equal(t, "library/harbor", (*result.Chart)[0].Name)
 
 	// Restore chart search handler
 	searchHandler = nil

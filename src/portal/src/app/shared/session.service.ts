@@ -20,10 +20,10 @@ import { Member } from '../project/member/member';
 
 import { SignInCredential } from './sign-in-credential';
 import { enLang } from '../shared/shared.const';
-import {HTTP_FORM_OPTIONS, HTTP_JSON_OPTIONS, HTTP_GET_OPTIONS} from "./shared.utils";
+import { HTTP_FORM_OPTIONS, HTTP_JSON_OPTIONS, HTTP_GET_OPTIONS } from "./shared.utils";
 
 const signInUrl = '/c/login';
-const currentUserEndpint = "/api/users/current";
+const currentUserEndpoint = "/api/users/current";
 const signOffEndpoint = "/c/log_out";
 const accountEndpoint = "/api/users/:id";
 const langEndpoint = "/language";
@@ -67,7 +67,7 @@ export class SessionService {
     signIn(signInCredential: SignInCredential): Promise<any> {
         // Build the form package
         let queryParam: string = 'principal=' + encodeURIComponent(signInCredential.principal) +
-        '&password=' + encodeURIComponent(signInCredential.password);
+            '&password=' + encodeURIComponent(signInCredential.password);
 
         // Trigger Http
         return this.http.post(signInUrl, queryParam, HTTP_FORM_OPTIONS)
@@ -84,7 +84,7 @@ export class SessionService {
      * @memberOf SessionService
      */
     retrieveUser(): Promise<SessionUser> {
-        return this.http.get(currentUserEndpint, HTTP_GET_OPTIONS).toPromise()
+        return this.http.get(currentUserEndpoint, HTTP_GET_OPTIONS).toPromise()
             .then(response => this.currentUser = response.json() as SessionUser)
             .catch(error => this.handleError(error));
     }
@@ -144,9 +144,9 @@ export class SessionService {
             return Promise.reject("Invalid account settings");
         }
         return this.http.post(renameAdminEndpoint, JSON.stringify({}), HTTP_JSON_OPTIONS)
-        .toPromise()
-        .then(() => null)
-        .catch(error => this.handleError(error));
+            .toPromise()
+            .then(() => null)
+            .catch(error => this.handleError(error));
     }
 
     /**

@@ -3,7 +3,7 @@ import { Component, Input, OnInit, ViewChild } from '@angular/core';
 import { toPromise, compareValue, clone } from '../utils';
 import { ProjectService } from '../service/project.service';
 import { ErrorHandler } from '../error-handler/error-handler';
-import { State } from '@clr/angular';
+import { State } from '../service/interface';
 
 import { ConfirmationState, ConfirmationTargets } from '../shared/shared.const';
 import { ConfirmationMessage } from '../confirmation-dialog/confirmation-message';
@@ -13,6 +13,8 @@ import { TranslateService } from '@ngx-translate/core';
 
 import { Project } from './project';
 import {SystemInfo, SystemInfoService} from '../service/index';
+import { UserPermissionService } from '../service/permission.service';
+import { USERSTATICPERMISSION } from '../service/permission-static';
 
 export class ProjectPolicy {
   Public: boolean;
@@ -56,7 +58,7 @@ export class ProjectPolicyConfigComponent implements OnInit {
   systemInfo: SystemInfo;
   orgProjectPolicy = new ProjectPolicy();
   projectPolicy = new ProjectPolicy();
-
+  hasChangeConfigRole: boolean;
   severityOptions = [
     {severity: 'high', severityLevel: 'VULNERABILITY.SEVERITY.HIGH'},
     {severity: 'medium', severityLevel: 'VULNERABILITY.SEVERITY.MEDIUM'},
@@ -69,6 +71,7 @@ export class ProjectPolicyConfigComponent implements OnInit {
     private translate: TranslateService,
     private projectService: ProjectService,
     private systemInfoService: SystemInfoService,
+    private userPermission: UserPermissionService
   ) {}
 
   ngOnInit(): void {
@@ -85,8 +88,14 @@ export class ProjectPolicyConfigComponent implements OnInit {
 
     // retrive project level policy data
     this.retrieve();
+    this.getPermission();
   }
-
+  private getPermission(): void {
+    this.userPermission.getPermission(this.projectId,
+      USERSTATICPERMISSION.CONFIGURATION.KEY, USERSTATICPERMISSION.CONFIGURATION.VALUE.UPDATE).subscribe(permissins => {
+        this.hasChangeConfigRole = permissins as boolean;
+      });
+  }
   public get withNotary(): boolean {
     return this.systemInfo ? this.systemInfo.with_notary : false;
   }
@@ -122,7 +131,7 @@ export class ProjectPolicyConfigComponent implements OnInit {
   }
 
   hasChanges() {
-    return !compareValue(this.orgProjectPolicy, this.projectPolicy);
+      return !compareValue(this.orgProjectPolicy, this.projectPolicy);
   }
 
   save() {

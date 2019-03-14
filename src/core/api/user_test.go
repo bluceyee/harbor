@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,6 +27,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/astaxie/beego"
+	"github.com/goharbor/harbor/src/common"
+	"github.com/goharbor/harbor/src/core/config"
 )
 
 var testUser0002ID, testUser0003ID int
@@ -39,7 +41,9 @@ func TestUsersPost(t *testing.T) {
 
 	assert := assert.New(t)
 	apiTest := newHarborAPI()
-
+	config.Upload(map[string]interface{}{
+		common.AUTHMode: "db_auth",
+	})
 	// case 1: register a new user without admin auth, expect 400, because self registration is on
 	fmt.Println("Register user without admin auth")
 	code, err := apiTest.UsersPost(testUser0002)
@@ -201,6 +205,35 @@ func TestUsersGet(t *testing.T) {
 		assert.Equal(200, code, "Get users status should be 200")
 		assert.Equal(1, len(users), "Get users record should be 1 ")
 		testUser0002ID = users[0].UserId
+	}
+}
+
+func TestUsersSearch(t *testing.T) {
+
+	fmt.Println("Testing User Search")
+	assert := assert.New(t)
+	apiTest := newHarborAPI()
+
+	testUser0002.Username = "testUser0002"
+	// case 1: Search user2 without auth, expect 401
+
+	testUser0002Auth = &usrInfo{"testUser0002", "testUser0002"}
+	code, users, err := apiTest.UsersSearch(testUser0002.Username)
+	if err != nil {
+		t.Error("Error occurred while search users", err.Error())
+		t.Log(err)
+	} else {
+		assert.Equal(401, code, "Search users status should be 401")
+	}
+	// case 2: Search user2 with with common auth, expect 200
+	code, users, err = apiTest.UsersSearch(testUser0002.Username, *testUser0002Auth)
+	if err != nil {
+		t.Error("Error occurred while search users", err.Error())
+		t.Log(err)
+	} else {
+		assert.Equal(200, code, "Search users status should be 200")
+		assert.Equal(1, len(users), "Search users record should be 1 ")
+		testUser0002ID = users[0].UserID
 	}
 }
 
@@ -528,47 +561,72 @@ func TestModifiable(t *testing.T) {
 	t.Log("Test modifiable.")
 	assert := assert.New(t)
 	base := BaseController{
-		api.BaseAPI{
-			beego.Controller{},
+		BaseAPI: api.BaseAPI{
+			Controller: beego.Controller{},
 		},
-		nil,
-		nil,
+		SecurityCtx: nil,
+		ProjectMgr:  nil,
 	}
 
 	ua1 := &UserAPI{
-		base,
-		3,
-		4,
-		false,
-		false,
-		"db_auth",
+		BaseController:   base,
+		currentUserID:    3,
+		userID:           4,
+		SelfRegistration: false,
+		IsAdmin:          false,
+		AuthMode:         "db_auth",
 	}
 	assert.False(ua1.modifiable())
 	ua2 := &UserAPI{
-		base,
-		3,
-		4,
-		false,
-		true,
-		"db_auth",
+		BaseController:   base,
+		currentUserID:    3,
+		userID:           4,
+		SelfRegistration: false,
+		IsAdmin:          true,
+		AuthMode:         "db_auth",
 	}
 	assert.True(ua2.modifiable())
 	ua3 := &UserAPI{
-		base,
-		3,
-		4,
-		false,
-		true,
-		"ldap_auth",
+		BaseController:   base,
+		currentUserID:    3,
+		userID:           4,
+		SelfRegistration: false,
+		IsAdmin:          true,
+		AuthMode:         "ldap_auth",
 	}
 	assert.False(ua3.modifiable())
 	ua4 := &UserAPI{
-		base,
-		1,
-		1,
-		false,
-		true,
-		"ldap_auth",
+		BaseController:   base,
+		currentUserID:    1,
+		userID:           1,
+		SelfRegistration: false,
+		IsAdmin:          true,
+		AuthMode:         "ldap_auth",
 	}
 	assert.True(ua4.modifiable())
+}
+
+func TestUsersCurrentPermissions(t *testing.T) {
+	fmt.Println("Testing Get Users Current Permissions")
+
+	assert := assert.New(t)
+	apiTest := newHarborAPI()
+
+	httpStatusCode, permissions, err := apiTest.UsersGetPermissions("current", "/project/library", *projAdmin)
+	assert.Nil(err)
+	assert.Equal(int(200), httpStatusCode, "httpStatusCode should be 200")
+	assert.NotEmpty(permissions, "permissions should not be empty")
+
+	httpStatusCode, permissions, err = apiTest.UsersGetPermissions("current", "/unsupport-scope", *projAdmin)
+	assert.Nil(err)
+	assert.Equal(int(200), httpStatusCode, "httpStatusCode should be 200")
+	assert.Empty(permissions, "permissions should be empty")
+
+	httpStatusCode, _, err = apiTest.UsersGetPermissions(projAdminID, "/project/library", *projAdmin)
+	assert.Nil(err)
+	assert.Equal(int(200), httpStatusCode, "httpStatusCode should be 200")
+
+	httpStatusCode, _, err = apiTest.UsersGetPermissions(projDeveloperID, "/project/library", *projAdmin)
+	assert.Nil(err)
+	assert.Equal(int(403), httpStatusCode, "httpStatusCode should be 403")
 }

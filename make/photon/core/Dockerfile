@@ -1,8 +1,6 @@
-FROM photon:1.0
+FROM photon:2.0
 
-RUN tdnf distro-sync -y \
-    && tdnf erase vim -y \
-    && tdnf install sudo -y >> /dev/null\
+RUN tdnf install sudo -y >> /dev/null\
     && tdnf clean all \
     && groupadd -r -g 10000 harbor && useradd --no-log-init -r -g 10000 -u 10000 harbor \
     && mkdir /harbor/
@@ -10,6 +8,7 @@ RUN tdnf distro-sync -y \
 HEALTHCHECK CMD curl --fail -s http://127.0.0.1:8080/api/ping || exit 1
 COPY ./make/photon/core/harbor_core ./make/photon/core/start.sh ./UIVERSION /harbor/
 COPY ./src/core/views /harbor/views
+COPY ./make/migrations /harbor/migrations
 
 RUN chmod u+x /harbor/start.sh /harbor/harbor_core
 WORKDIR /harbor/

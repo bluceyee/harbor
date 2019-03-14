@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 
 	"github.com/goharbor/harbor/src/common/dao"
 	"github.com/goharbor/harbor/src/common/models"
+	"github.com/goharbor/harbor/src/common/rbac"
 	"github.com/goharbor/harbor/src/common/utils/log"
 	api_models "github.com/goharbor/harbor/src/core/api/models"
 	"github.com/goharbor/harbor/src/core/promgr"
@@ -63,7 +64,8 @@ func (pa *RepPolicyAPI) Get() {
 		return
 	}
 
-	if !pa.SecurityCtx.HasAllPerm(policy.ProjectIDs[0]) {
+	resource := rbac.NewProjectNamespace(policy.ProjectIDs[0]).Resource(rbac.ResourceReplication)
+	if !pa.SecurityCtx.Can(rbac.ActionRead, resource) {
 		pa.HandleForbidden(pa.SecurityCtx.GetUsername())
 		return
 	}
@@ -105,7 +107,8 @@ func (pa *RepPolicyAPI) List() {
 	if result != nil {
 		total = result.Total
 		for _, policy := range result.Policies {
-			if !pa.SecurityCtx.HasAllPerm(policy.ProjectIDs[0]) {
+			resource := rbac.NewProjectNamespace(policy.ProjectIDs[0]).Resource(rbac.ResourceReplication)
+			if !pa.SecurityCtx.Can(rbac.ActionRead, resource) {
 				continue
 			}
 			ply, err := convertFromRepPolicy(pa.ProjectMgr, *policy)
@@ -127,6 +130,18 @@ func (pa *RepPolicyAPI) List() {
 func (pa *RepPolicyAPI) Post() {
 	policy := &api_models.ReplicationPolicy{}
 	pa.DecodeJSONReqAndValidate(policy)
+
+	// check the name
+	exist, err := exist(policy.Name)
+	if err != nil {
+		pa.HandleInternalServerError(fmt.Sprintf("failed to check the existence of policy %s: %v", policy.Name, err))
+		return
+	}
+
+	if exist {
+		pa.HandleConflict(fmt.Sprintf("name %s is already used", policy.Name))
+		return
+	}
 
 	// check the existence of projects
 	for _, project := range policy.Projects {
@@ -180,7 +195,7 @@ func (pa *RepPolicyAPI) Post() {
 
 	if policy.ReplicateExistingImageNow {
 		go func() {
-			if err = startReplication(id); err != nil {
+			if _, err = startReplication(id); err != nil {
 				log.Errorf("failed to send replication signal for policy %d: %v", id, err)
 				return
 			}
@@ -189,6 +204,22 @@ func (pa *RepPolicyAPI) Post() {
 	}
 
 	pa.Redirect(http.StatusCreated, strconv.FormatInt(id, 10))
+}
+
+func exist(name string) (bool, error) {
+	result, err := core.GlobalController.GetPolicies(rep_models.QueryParameter{
+		Name: name,
+	})
+	if err != nil {
+		return false, err
+	}
+
+	for _, policy := range result.Policies {
+		if policy.Name == name {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // Put updates the replication policy
@@ -210,6 +241,20 @@ func (pa *RepPolicyAPI) Put() {
 	pa.DecodeJSONReqAndValidate(policy)
 
 	policy.ID = id
+
+	// check the name
+	if policy.Name != originalPolicy.Name {
+		exist, err := exist(policy.Name)
+		if err != nil {
+			pa.HandleInternalServerError(fmt.Sprintf("failed to check the existence of policy %s: %v", policy.Name, err))
+			return
+		}
+
+		if exist {
+			pa.HandleConflict(fmt.Sprintf("name %s is already used", policy.Name))
+			return
+		}
+	}
 
 	// check the existence of projects
 	for _, project := range policy.Projects {
@@ -262,7 +307,7 @@ func (pa *RepPolicyAPI) Put() {
 
 	if policy.ReplicateExistingImageNow {
 		go func() {
-			if err = startReplication(id); err != nil {
+			if _, err = startReplication(id); err != nil {
 				log.Errorf("failed to send replication signal for policy %d: %v", id, err)
 				return
 			}

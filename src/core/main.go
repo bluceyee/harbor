@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"os"
-	"reflect"
 	"strconv"
 
 	"github.com/astaxie/beego"
@@ -29,6 +28,7 @@ import (
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/common/utils/log"
 	"github.com/goharbor/harbor/src/core/api"
+	_ "github.com/goharbor/harbor/src/core/auth/authproxy"
 	_ "github.com/goharbor/harbor/src/core/auth/db"
 	_ "github.com/goharbor/harbor/src/core/auth/ldap"
 	_ "github.com/goharbor/harbor/src/core/auth/uaa"
@@ -73,6 +73,7 @@ func updateInitPassword(userID int, password string) error {
 
 func main() {
 	beego.BConfig.WebConfig.Session.SessionOn = true
+	beego.BConfig.WebConfig.Session.SessionName = "sid"
 	// TODO
 	redisURL := os.Getenv("_REDIS_URL")
 	if len(redisURL) > 0 {
@@ -92,8 +93,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to get database configuration: %v", err)
 	}
-	if err := dao.InitDatabase(database); err != nil {
+	if err := dao.InitAndUpgradeDatabase(database); err != nil {
 		log.Fatalf("failed to initialize database: %v", err)
+	}
+	if err := config.Load(); err != nil {
+		log.Fatalf("failed to load config: %v", err)
 	}
 
 	password, err := config.InitialAdminPassword()
@@ -121,22 +125,6 @@ func main() {
 		}
 		if err := dao.InitClairDB(clairDB); err != nil {
 			log.Fatalf("failed to initialize clair database: %v", err)
-		}
-		// Get policy configuration.
-		scanAllPolicy := config.ScanAllPolicy()
-		if scanAllPolicy.Type == notifier.PolicyTypeDaily {
-			dailyTime := 0
-			if t, ok := scanAllPolicy.Parm["daily_time"]; ok {
-				if reflect.TypeOf(t).Kind() == reflect.Int {
-					dailyTime = t.(int)
-				}
-			}
-
-			// Send notification to handle first policy change.
-			if err = notifier.Publish(notifier.ScanAllPolicyTopic,
-				notifier.ScanPolicyNotification{Type: scanAllPolicy.Type, DailyTime: (int64)(dailyTime)}); err != nil {
-				log.Errorf("failed to publish scan all policy topic: %v", err)
-			}
 		}
 	}
 

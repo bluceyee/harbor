@@ -1,4 +1,7 @@
 import { Project } from "../project-policy-config/project";
+import { Observable } from 'rxjs';
+import { ClrModal } from '@clr/angular';
+
 /**
  * The base interface contains the general properties
  *
@@ -55,6 +58,7 @@ export interface Tag extends Base {
   size: string;
   architecture: string;
   os: string;
+  'os.version': string;
   docker_version: string;
   author: string;
   created: Date;
@@ -115,8 +119,8 @@ export class Trigger {
   schedule_param:
     | any
     | {
-        [key: string]: any | any[];
-      };
+      [key: string]: any | any[];
+    };
   constructor(kind: string, param: any | { [key: string]: any | any[] }) {
     this.kind = kind;
     this.schedule_param = param;
@@ -285,7 +289,6 @@ export interface Label {
   scope: string;
   project_id: number;
 }
-
 export interface CardItemEvent {
   event_type: string;
   item: any;
@@ -297,18 +300,23 @@ export interface ScrollPosition {
   sT: number;
   cH: number;
 }
-
+export interface HelmChartSearchResultItem {
+  Name: string;
+  Score: number;
+  Chart: HelmChartVersion;
+}
 export interface HelmChartItem {
   name: string;
   total_versions: number;
   latest_version: string;
   created: string;
+  updated: string;
   icon: string;
   home: string;
+  deprecated?: boolean;
   status?: string;
   pulls?: number;
   maintainer?: string;
-  deprecated?: boolean;
 }
 
 export interface HelmChartVersion {
@@ -322,9 +330,11 @@ export interface HelmChartVersion {
   engine: string;
   icon: string;
   appVersion: string;
+  apiVersion: string;
   urls: string[];
   created: string;
   digest: string;
+  labels: Label[];
   deprecated?: boolean;
 }
 
@@ -334,6 +344,7 @@ export interface HelmChartDetail {
   values: any;
   files: HelmchartFile;
   security: HelmChartSecurity;
+  labels: Label[];
 }
 
 export interface HelmChartMetaData {
@@ -376,3 +387,67 @@ export interface HelmChartSignature {
   signed: boolean;
   prov_file: string;
 }
+
+/**
+ * The manifest of image.
+ *
+ **
+ * interface Manifest
+ */
+export interface Manifest {
+  manifset: Object;
+  config: string;
+}
+
+export interface RetagRequest {
+  targetProject: string;
+  targetRepo: string;
+  targetTag: string;
+  srcImage: string;
+  override: boolean;
+}
+
+export interface ClrDatagridComparatorInterface<T> {
+  compare(a: T, b: T): number;
+}
+
+export interface ClrDatagridStateInterface {
+  page?: { from?: number; to?: number; size?: number };
+  sort?: { by: string | ClrDatagridComparatorInterface<any>; reverse: boolean };
+  filters?: ({ property: string; value: string } | ClrDatagridFilterInterface<any>)[];
+}
+
+export interface ClrDatagridFilterInterface<T> {
+  isActive(): boolean;
+
+  accepts(item: T): boolean;
+
+  changes: Observable<any>;
+}
+
+/** @deprecated since 0.11 */
+export interface Comparator<T> extends ClrDatagridComparatorInterface<T> { }
+/** @deprecated since 0.11 */
+export interface ClrFilter<T> extends ClrDatagridFilterInterface<T> { }
+/** @deprecated since 0.11 */
+export interface State extends ClrDatagridStateInterface { }
+export interface Modal extends ClrModal { }
+export const Modal = ClrModal;
+
+/**
+ * The access user privilege from serve.
+ *
+ **
+ * interface UserPrivilegeServe
+ */
+export interface UserPrivilegeServeItem {
+  [key: string]: any | any[];
+  resource: string;
+  action: string;
+}
+
+export class OriginCron {
+  type: string;
+  cron: string;
+}
+

@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,10 +28,11 @@ import (
 	"github.com/docker/distribution/manifest/schema2"
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/dao"
+	commonhttp "github.com/goharbor/harbor/src/common/http"
 	"github.com/goharbor/harbor/src/common/models"
+	"github.com/goharbor/harbor/src/common/rbac"
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/common/utils/clair"
-	registry_error "github.com/goharbor/harbor/src/common/utils/error"
 	"github.com/goharbor/harbor/src/common/utils/log"
 	"github.com/goharbor/harbor/src/common/utils/notary"
 	"github.com/goharbor/harbor/src/common/utils/registry"
@@ -82,6 +83,7 @@ type tagDetail struct {
 	Size          int64     `json:"size"`
 	Architecture  string    `json:"architecture"`
 	OS            string    `json:"os"`
+	OSVersion     string    `json:"os.version"`
 	DockerVersion string    `json:"docker_version"`
 	Author        string    `json:"author"`
 	Created       time.Time `json:"created"`
@@ -130,7 +132,8 @@ func (ra *RepositoryAPI) Get() {
 		return
 	}
 
-	if !ra.SecurityCtx.HasReadPerm(projectID) {
+	resource := rbac.NewProjectNamespace(projectID).Resource(rbac.ResourceRepository)
+	if !ra.SecurityCtx.Can(rbac.ActionList, resource) {
 		if !ra.SecurityCtx.IsAuthenticated() {
 			ra.HandleUnauthorized()
 			return
@@ -246,7 +249,8 @@ func (ra *RepositoryAPI) Delete() {
 		return
 	}
 
-	if !ra.SecurityCtx.HasAllPerm(projectName) {
+	resource := rbac.NewProjectNamespace(project.ProjectID).Resource(rbac.ResourceRepository)
+	if !ra.SecurityCtx.Can(rbac.ActionDelete, resource) {
 		ra.HandleForbidden(ra.SecurityCtx.GetUsername())
 		return
 	}
@@ -264,8 +268,8 @@ func (ra *RepositoryAPI) Delete() {
 		if err != nil {
 			log.Errorf("error occurred while listing tags of %s: %v", repoName, err)
 
-			if regErr, ok := err.(*registry_error.HTTPError); ok {
-				ra.CustomAbort(regErr.StatusCode, regErr.Detail)
+			if regErr, ok := err.(*commonhttp.Error); ok {
+				ra.CustomAbort(regErr.Code, regErr.Message)
 			}
 
 			ra.CustomAbort(http.StatusInternalServerError, "internal error")
@@ -311,12 +315,12 @@ func (ra *RepositoryAPI) Delete() {
 			return
 		}
 		if err = rc.DeleteTag(t); err != nil {
-			if regErr, ok := err.(*registry_error.HTTPError); ok {
-				if regErr.StatusCode == http.StatusNotFound {
+			if regErr, ok := err.(*commonhttp.Error); ok {
+				if regErr.Code == http.StatusNotFound {
 					continue
 				}
 				log.Errorf("failed to delete tag %s: %v", t, err)
-				ra.CustomAbort(regErr.StatusCode, regErr.Detail)
+				ra.CustomAbort(regErr.Code, regErr.Message)
 			}
 			log.Errorf("error occurred while deleting tag %s:%s: %v", repoName, t, err)
 			ra.CustomAbort(http.StatusInternalServerError, "internal error")
@@ -392,7 +396,8 @@ func (ra *RepositoryAPI) GetTag() {
 		return
 	}
 	project, _ := utils.ParseRepository(repository)
-	if !ra.SecurityCtx.HasReadPerm(project) {
+	resource := rbac.NewProjectNamespace(project).Resource(rbac.ResourceRepositoryTag)
+	if !ra.SecurityCtx.Can(rbac.ActionRead, resource) {
 		if !ra.SecurityCtx.IsAuthenticated() {
 			ra.HandleUnauthorized()
 			return
@@ -424,6 +429,94 @@ func (ra *RepositoryAPI) GetTag() {
 	ra.ServeJSON()
 }
 
+// Retag tags an existing image to another tag in this repo, the source image is specified by request body.
+func (ra *RepositoryAPI) Retag() {
+	if !ra.SecurityCtx.IsAuthenticated() {
+		ra.HandleUnauthorized()
+		return
+	}
+
+	repoName := ra.GetString(":splat")
+	project, repo := utils.ParseRepository(repoName)
+	if !utils.ValidateRepo(repo) {
+		ra.HandleBadRequest(fmt.Sprintf("invalid repo '%s'", repo))
+		return
+	}
+
+	request := models.RetagRequest{}
+	ra.DecodeJSONReq(&request)
+	srcImage, err := models.ParseImage(request.SrcImage)
+	if err != nil {
+		ra.HandleBadRequest(fmt.Sprintf("invalid src image string '%s', should in format '<project>/<repo>:<tag>'", request.SrcImage))
+		return
+	}
+
+	if !utils.ValidateTag(request.Tag) {
+		ra.HandleBadRequest(fmt.Sprintf("invalid tag '%s'", request.Tag))
+		return
+	}
+
+	// Check whether source image exists
+	exist, _, err := ra.checkExistence(fmt.Sprintf("%s/%s", srcImage.Project, srcImage.Repo), srcImage.Tag)
+	if err != nil {
+		ra.HandleInternalServerError(fmt.Sprintf("check existence of %s error: %v", request.SrcImage, err))
+		return
+	}
+	if !exist {
+		ra.HandleNotFound(fmt.Sprintf("image %s not exist", request.SrcImage))
+		return
+	}
+
+	// Check whether target project exists
+	exist, err = ra.ProjectMgr.Exists(project)
+	if err != nil {
+		ra.ParseAndHandleError(fmt.Sprintf("failed to check the existence of project %s", project), err)
+		return
+	}
+	if !exist {
+		ra.HandleNotFound(fmt.Sprintf("project %s not found", project))
+		return
+	}
+
+	// If override not allowed, check whether target tag already exists
+	if !request.Override {
+		exist, _, err := ra.checkExistence(repoName, request.Tag)
+		if err != nil {
+			ra.HandleInternalServerError(fmt.Sprintf("check existence of %s:%s error: %v", repoName, request.Tag, err))
+			return
+		}
+		if exist {
+			ra.HandleConflict(fmt.Sprintf("tag '%s' already existed for '%s'", request.Tag, repoName))
+			return
+		}
+	}
+
+	// Check whether user has read permission to source project
+	srcResource := rbac.NewProjectNamespace(srcImage.Project).Resource(rbac.ResourceRepository)
+	if !ra.SecurityCtx.Can(rbac.ActionPull, srcResource) {
+		log.Errorf("user has no read permission to project '%s'", srcImage.Project)
+		ra.HandleForbidden(fmt.Sprintf("%s has no read permission to project %s", ra.SecurityCtx.GetUsername(), srcImage.Project))
+		return
+	}
+
+	// Check whether user has write permission to target project
+	destResource := rbac.NewProjectNamespace(project).Resource(rbac.ResourceRepository)
+	if !ra.SecurityCtx.Can(rbac.ActionPush, destResource) {
+		log.Errorf("user has no write permission to project '%s'", project)
+		ra.HandleForbidden(fmt.Sprintf("%s has no write permission to project %s", ra.SecurityCtx.GetUsername(), project))
+		return
+	}
+
+	// Retag the image
+	if err = coreutils.Retag(srcImage, &models.Image{
+		Project: project,
+		Repo:    repo,
+		Tag:     request.Tag,
+	}); err != nil {
+		ra.HandleInternalServerError(fmt.Sprintf("%v", err))
+	}
+}
+
 // GetTags returns tags of a repository
 func (ra *RepositoryAPI) GetTags() {
 	repoName := ra.GetString(":splat")
@@ -446,7 +539,8 @@ func (ra *RepositoryAPI) GetTags() {
 		return
 	}
 
-	if !ra.SecurityCtx.HasReadPerm(projectName) {
+	resource := rbac.NewProjectNamespace(projectName).Resource(rbac.ResourceRepositoryTag)
+	if !ra.SecurityCtx.Can(rbac.ActionList, resource) {
 		if !ra.SecurityCtx.IsAuthenticated() {
 			ra.HandleUnauthorized()
 			return
@@ -654,7 +748,8 @@ func (ra *RepositoryAPI) GetManifests() {
 		return
 	}
 
-	if !ra.SecurityCtx.HasReadPerm(projectName) {
+	resource := rbac.NewProjectNamespace(projectName).Resource(rbac.ResourceRepositoryTagManifest)
+	if !ra.SecurityCtx.Can(rbac.ActionRead, resource) {
 		if !ra.SecurityCtx.IsAuthenticated() {
 			ra.HandleUnauthorized()
 			return
@@ -674,8 +769,8 @@ func (ra *RepositoryAPI) GetManifests() {
 	if err != nil {
 		log.Errorf("error occurred while getting manifest of %s:%s: %v", repoName, tag, err)
 
-		if regErr, ok := err.(*registry_error.HTTPError); ok {
-			ra.CustomAbort(regErr.StatusCode, regErr.Detail)
+		if regErr, ok := err.(*commonhttp.Error); ok {
+			ra.CustomAbort(regErr.Code, regErr.Message)
 		}
 
 		ra.CustomAbort(http.StatusInternalServerError, "internal error")
@@ -785,7 +880,8 @@ func (ra *RepositoryAPI) Put() {
 	}
 
 	project, _ := utils.ParseRepository(name)
-	if !ra.SecurityCtx.HasWritePerm(project) {
+	resource := rbac.NewProjectNamespace(project).Resource(rbac.ResourceRepository)
+	if !ra.SecurityCtx.Can(rbac.ActionUpdate, resource) {
 		ra.HandleForbidden(ra.SecurityCtx.GetUsername())
 		return
 	}
@@ -819,7 +915,8 @@ func (ra *RepositoryAPI) GetSignatures() {
 		return
 	}
 
-	if !ra.SecurityCtx.HasReadPerm(projectName) {
+	resource := rbac.NewProjectNamespace(projectName).Resource(rbac.ResourceRepository)
+	if !ra.SecurityCtx.Can(rbac.ActionRead, resource) {
 		if !ra.SecurityCtx.IsAuthenticated() {
 			ra.HandleUnauthorized()
 			return
@@ -862,7 +959,9 @@ func (ra *RepositoryAPI) ScanImage() {
 		ra.HandleUnauthorized()
 		return
 	}
-	if !ra.SecurityCtx.HasAllPerm(projectName) {
+
+	resource := rbac.NewProjectNamespace(projectName).Resource(rbac.ResourceRepositoryTagScanJob)
+	if !ra.SecurityCtx.Can(rbac.ActionCreate, resource) {
 		ra.HandleForbidden(ra.SecurityCtx.GetUsername())
 		return
 	}
@@ -893,7 +992,9 @@ func (ra *RepositoryAPI) VulnerabilityDetails() {
 		return
 	}
 	project, _ := utils.ParseRepository(repository)
-	if !ra.SecurityCtx.HasReadPerm(project) {
+
+	resource := rbac.NewProjectNamespace(project).Resource(rbac.ResourceRepositoryTagVulnerability)
+	if !ra.SecurityCtx.Can(rbac.ActionList, resource) {
 		if !ra.SecurityCtx.IsAuthenticated() {
 			ra.HandleUnauthorized()
 			return
@@ -936,18 +1037,15 @@ func (ra *RepositoryAPI) ScanAll() {
 		ra.HandleForbidden(ra.SecurityCtx.GetUsername())
 		return
 	}
-	if !utils.ScanAllMarker().Check() {
-		log.Warningf("There is a scan all scheduled at: %v, the request will not be processed.", utils.ScanAllMarker().Next())
-		ra.RenderError(http.StatusPreconditionFailed, "Unable handle frequent scan all requests")
-		return
-	}
-
 	if err := coreutils.ScanAllImages(); err != nil {
 		log.Errorf("Failed triggering scan all images, error: %v", err)
+		if httpErr, ok := err.(*commonhttp.Error); ok && httpErr.Code == http.StatusConflict {
+			ra.HandleConflict("Conflict when triggering scan all images, please try again later.")
+			return
+		}
 		ra.HandleInternalServerError(fmt.Sprintf("Error: %v", err))
 		return
 	}
-	utils.ScanAllMarker().Mark()
 	ra.Ctx.ResponseWriter.WriteHeader(http.StatusAccepted)
 }
 

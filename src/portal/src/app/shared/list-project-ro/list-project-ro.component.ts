@@ -13,7 +13,7 @@
 // limitations under the License.
 import { Component, EventEmitter, Output, Input, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { Router } from '@angular/router';
-import { State } from '@clr/angular';
+import { State } from '../../../../lib/src/service/interface';
 
 import { SearchTriggerService } from '../../base/global-search/search-trigger.service';
 import { Project } from '../../project/project';
@@ -30,11 +30,7 @@ export class ListProjectROComponent {
 
   constructor(
     private searchTrigger: SearchTriggerService,
-    private router: Router,
-    private ref: ChangeDetectorRef) {
-    let hnd = setInterval(() => ref.markForCheck(), 100);
-    setTimeout(() => clearInterval(hnd), 1000);
-  }
+    private router: Router) {}
 
   goToLink(proId: number): void {
     this.searchTrigger.closeSearch(true);

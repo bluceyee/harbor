@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -204,6 +204,18 @@ func TestProjectMemberAPI_PutAndDelete(t *testing.T) {
 				url:    URL,
 				bodyJSON: &models.Member{
 					Role: 2,
+				},
+				credential: admin,
+			},
+			code: http.StatusOK,
+		},
+		// 200
+		{
+			request: &testingRequest{
+				method: http.MethodPut,
+				url:    URL,
+				bodyJSON: &models.Member{
+					Role: 4,
 				},
 				credential: admin,
 			},

@@ -1,3 +1,5 @@
+@import "../mixin";
+
 .option-right {
   padding-right: 18px;
   padding-bottom: 6px;
@@ -49,9 +51,10 @@
 
 .rightPos {
   position: absolute;
-  z-index: 100;
+  z-index: 600;
   right: 35px;
-  margin-top: 4px;
+  margin-top: 20px;
+  display: flex;
 }
 
 .btn-group .dropdown-menu clr-icon {
@@ -62,7 +65,8 @@
   position: relative;
   padding-left: .5rem;
   padding-right: .5rem;
-  line-height: 1.0
+  line-height: 1.0;
+  height: 1.2rem;
 }
 
 .dropdown-menu input {
@@ -132,7 +136,7 @@
 }
 
 .dropdown .dropdown-toggle.btn {
-  margin: .25rem .5rem .25rem 0;
+  @include dropdown-as-action-button;
 }
 
 .labelFilterPanel {
@@ -147,6 +151,24 @@
   min-width: 5rem;
   max-width: 15rem;
   border-radius: .125rem;
+  .form-group input {
+    position: relative;
+    margin-left: .5rem;
+    margin-right: .5rem;
+  }
+}
+
+.no-labels {
+  padding-left: 10px;
+}
+
+.has-label {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.filter-grid {
+  display: grid;
 }
 
 .labelBtn {
@@ -184,16 +206,47 @@
   color: #313131;
 }
 
-.labelFilterPanel .form-group input {
-  position: relative;
-  margin-left: .5rem;
-  margin-right: .5rem;
-}
-
 .filterClose {
   position: absolute;
   right: 8px;
   top: 5px;
   cursor: pointer;
   font-size: 20px;
+}
+
+.retag-modal-body {
+  overflow-y: hidden;
+  min-height: 450px;
+  padding-top: 16px;
+}
+
+hbr-image-name-input {
+  width: 100%;
+}
+
+.tag-row {
+  position: relative;
+}
+
+.datagrid-top {
+  .flex-max-width {
+    max-width: 220px
+  }
+}
+
+.color-green {
+  color: #1D5100;
+}
+
+.color-red {
+  color: #C92100;
+}
+
+.color-gray {
+  color: #565656;
+}
+clr-datagrid {
+  ::ng-deep .datagrid-table {
+    position: static;
+  }
 }

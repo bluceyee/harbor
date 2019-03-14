@@ -12,7 +12,7 @@
     @include text-overflow;
 }
 
-@mixin grid-left-top-pos{
+@mixin grid-right-top-pos{
     position: absolute;
     z-index: 100;
     right: 35px;
@@ -34,4 +34,8 @@
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+@mixin dropdown-as-action-button {
+    margin: .25rem .5rem .25rem 0;
 }

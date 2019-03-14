@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@ import (
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/dao"
 	"github.com/goharbor/harbor/src/common/models"
+	"github.com/goharbor/harbor/src/common/rbac"
+	"github.com/goharbor/harbor/src/common/rbac/project"
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/common/utils/log"
 	"github.com/goharbor/harbor/src/core/config"
@@ -42,6 +44,11 @@ type UserAPI struct {
 type passwordReq struct {
 	OldPassword string `json:"old_password"`
 	NewPassword string `json:"new_password"`
+}
+
+type userSearch struct {
+	UserID   int    `json:"user_id"`
+	Username string `json:"username"`
 }
 
 // Prepare validates the URL and parms
@@ -161,6 +168,40 @@ func (ua *UserAPI) List() {
 
 	ua.SetPaginationHeader(total, page, size)
 	ua.Data["json"] = users
+	ua.ServeJSON()
+}
+
+// Search ...
+func (ua *UserAPI) Search() {
+	page, size := ua.GetPaginationParams()
+	query := &models.UserQuery{
+		Username: ua.GetString("username"),
+		Email:    ua.GetString("email"),
+		Pagination: &models.Pagination{
+			Page: page,
+			Size: size,
+		},
+	}
+
+	total, err := dao.GetTotalOfUsers(query)
+	if err != nil {
+		ua.HandleInternalServerError(fmt.Sprintf("failed to get total of users: %v", err))
+		return
+	}
+
+	users, err := dao.ListUsers(query)
+	if err != nil {
+		ua.HandleInternalServerError(fmt.Sprintf("failed to get users: %v", err))
+		return
+	}
+
+	var userSearches []userSearch
+	for _, user := range users {
+		userSearches = append(userSearches, userSearch{UserID: user.UserID, Username: user.Username})
+	}
+
+	ua.SetPaginationHeader(total, page, size)
+	ua.Data["json"] = userSearches
 	ua.ServeJSON()
 }
 
@@ -304,7 +345,8 @@ func (ua *UserAPI) ChangePassword() {
 	}
 	if changePwdOfOwn {
 		if user.Password != utils.Encrypt(req.OldPassword, user.Salt) {
-			ua.HandleForbidden("incorrect old_password")
+			log.Info("incorrect old_password")
+			ua.RenderError(http.StatusForbidden, "incorrect old_password")
 			return
 		}
 	}
@@ -338,6 +380,57 @@ func (ua *UserAPI) ToggleUserAdminRole() {
 	}
 }
 
+// ListUserPermissions handles GET to /api/users/{}/permissions
+func (ua *UserAPI) ListUserPermissions() {
+	if ua.userID != ua.currentUserID {
+		log.Warningf("Current user, id: %d can not view other user's permissions", ua.currentUserID)
+		ua.RenderError(http.StatusForbidden, "User does not have permission")
+		return
+	}
+
+	relative := ua.Ctx.Input.Query("relative") == "true"
+
+	scope := rbac.Resource(ua.Ctx.Input.Query("scope"))
+	policies := []*rbac.Policy{}
+
+	namespace, err := scope.GetNamespace()
+	if err == nil {
+		switch namespace.Kind() {
+		case "project":
+			for _, policy := range project.GetAllPolicies(namespace) {
+				if ua.SecurityCtx.Can(policy.Action, policy.Resource) {
+					policies = append(policies, policy)
+				}
+			}
+		}
+	}
+
+	results := []map[string]string{}
+	for _, policy := range policies {
+		var resource rbac.Resource
+
+		// for resource `/project/1/repository` if `relative` is `true` then the resource in response will be `repository`
+		if relative {
+			relativeResource, err := policy.Resource.RelativeTo(scope)
+			if err != nil {
+				continue
+			}
+			resource = relativeResource
+		} else {
+			resource = policy.Resource
+		}
+
+		results = append(results, map[string]string{
+			"resource": resource.String(),
+			"action":   policy.Action.String(),
+		})
+	}
+
+	ua.Data["json"] = results
+	ua.ServeJSON()
+	return
+}
+
 // modifiable returns whether the modify is allowed based on current auth mode and context
 func (ua *UserAPI) modifiable() bool {
 	if ua.AuthMode == common.DBAuth {
@@ -353,7 +446,7 @@ func (ua *UserAPI) modifiable() bool {
 // validate only validate when user register
 func validate(user models.User) error {
 
-	if isIllegalLength(user.Username, 1, 20) {
+	if isIllegalLength(user.Username, 1, 255) {
 		return fmt.Errorf("username with illegal length")
 	}
 	if isContainIllegalChar(user.Username, []string{",", "~", "#", "$", "%"}) {

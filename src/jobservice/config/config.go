@@ -1,4 +1,16 @@
-// Copyright Project Harbor Authors. All rights reserved.
+// Copyright Project Harbor Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 // Package config provides functions to handle the configurations of job service.
 package config
@@ -16,19 +28,16 @@ import (
 )
 
 const (
-	jobServiceProtocol            = "JOB_SERVICE_PROTOCOL"
-	jobServicePort                = "JOB_SERVICE_PORT"
-	jobServiceHTTPCert            = "JOB_SERVICE_HTTPS_CERT"
-	jobServiceHTTPKey             = "JOB_SERVICE_HTTPS_KEY"
-	jobServiceWorkerPoolBackend   = "JOB_SERVICE_POOL_BACKEND"
-	jobServiceWorkers             = "JOB_SERVICE_POOL_WORKERS"
-	jobServiceRedisURL            = "JOB_SERVICE_POOL_REDIS_URL"
-	jobServiceRedisNamespace      = "JOB_SERVICE_POOL_REDIS_NAMESPACE"
-	jobServiceLoggerBasePath      = "JOB_SERVICE_LOGGER_BASE_PATH"
-	jobServiceLoggerLevel         = "JOB_SERVICE_LOGGER_LEVEL"
-	jobServiceLoggerArchivePeriod = "JOB_SERVICE_LOGGER_ARCHIVE_PERIOD"
-	jobServiceAdminServerEndpoint = "ADMINSERVER_URL"
-	jobServiceAuthSecret          = "JOBSERVICE_SECRET"
+	jobServiceProtocol           = "JOB_SERVICE_PROTOCOL"
+	jobServicePort               = "JOB_SERVICE_PORT"
+	jobServiceHTTPCert           = "JOB_SERVICE_HTTPS_CERT"
+	jobServiceHTTPKey            = "JOB_SERVICE_HTTPS_KEY"
+	jobServiceWorkerPoolBackend  = "JOB_SERVICE_POOL_BACKEND"
+	jobServiceWorkers            = "JOB_SERVICE_POOL_WORKERS"
+	jobServiceRedisURL           = "JOB_SERVICE_POOL_REDIS_URL"
+	jobServiceRedisNamespace     = "JOB_SERVICE_POOL_REDIS_NAMESPACE"
+	jobServiceCoreServerEndpoint = "CORE_URL"
+	jobServiceAuthSecret         = "JOBSERVICE_SECRET"
 
 	// JobServiceProtocolHTTPS points to the 'https' protocol
 	JobServiceProtocolHTTPS = "https"
@@ -56,16 +65,17 @@ type Configuration struct {
 	// Server listening port
 	Port uint `yaml:"port"`
 
-	AdminServer string `yaml:"admin_server"`
-
 	// Additional config when using https
 	HTTPSConfig *HTTPSConfig `yaml:"https_config,omitempty"`
 
 	// Configurations of worker pool
 	PoolConfig *PoolConfig `yaml:"worker_pool,omitempty"`
 
+	// Job logger configurations
+	JobLoggerConfigs []*LoggerConfig `yaml:"job_loggers,omitempty"`
+
 	// Logger configurations
-	LoggerConfig *LoggerConfig `yaml:"logger,omitempty"`
+	LoggerConfigs []*LoggerConfig `yaml:"loggers,omitempty"`
 }
 
 // HTTPSConfig keeps additional configurations when using https protocol
@@ -88,11 +98,21 @@ type PoolConfig struct {
 	RedisPoolCfg *RedisPoolConfig `yaml:"redis_pool,omitempty"`
 }
 
-// LoggerConfig keeps logger configurations.
+// CustomizedSettings keeps the customized settings of logger
+type CustomizedSettings map[string]interface{}
+
+// LogSweeperConfig keeps settings of log sweeper
+type LogSweeperConfig struct {
+	Duration int                `yaml:"duration"`
+	Settings CustomizedSettings `yaml:"settings"`
+}
+
+// LoggerConfig keeps logger basic configurations.
 type LoggerConfig struct {
-	BasePath      string `yaml:"path"`
-	LogLevel      string `yaml:"level"`
-	ArchivePeriod uint   `yaml:"archive_period"`
+	Name     string             `yaml:"name"`
+	Level    string             `yaml:"level"`
+	Settings CustomizedSettings `yaml:"settings"`
+	Sweeper  *LogSweeperConfig  `yaml:"sweeper"`
 }
 
 // Load the configuration options from the specified yaml file.
@@ -139,33 +159,6 @@ func (c *Configuration) Load(yamlFilePath string, detectEnv bool) error {
 	return c.validate()
 }
 
-// GetLogBasePath returns the log base path config
-func GetLogBasePath() string {
-	if DefaultConfig.LoggerConfig != nil {
-		return DefaultConfig.LoggerConfig.BasePath
-	}
-
-	return ""
-}
-
-// GetLogLevel returns the log level
-func GetLogLevel() string {
-	if DefaultConfig.LoggerConfig != nil {
-		return DefaultConfig.LoggerConfig.LogLevel
-	}
-
-	return ""
-}
-
-// GetLogArchivePeriod returns the archive period
-func GetLogArchivePeriod() uint {
-	if DefaultConfig.LoggerConfig != nil {
-		return DefaultConfig.LoggerConfig.ArchivePeriod
-	}
-
-	return 1 // return default
-}
-
 // GetAuthSecret get the auth secret from the env
 func GetAuthSecret() string {
 	return utils.ReadEnv(jobServiceAuthSecret)
@@ -174,11 +167,6 @@ func GetAuthSecret() string {
 // GetUIAuthSecret get the auth secret of UI side
 func GetUIAuthSecret() string {
 	return utils.ReadEnv(uiAuthSecret)
-}
-
-// GetAdminServerEndpoint return the admin server endpoint
-func GetAdminServerEndpoint() string {
-	return DefaultConfig.AdminServer
 }
 
 // Load env variables
@@ -256,36 +244,6 @@ func (c *Configuration) loadEnvs() {
 		}
 	}
 
-	// logger
-	loggerPath := utils.ReadEnv(jobServiceLoggerBasePath)
-	if !utils.IsEmptyStr(loggerPath) {
-		if c.LoggerConfig == nil {
-			c.LoggerConfig = &LoggerConfig{}
-		}
-		c.LoggerConfig.BasePath = loggerPath
-	}
-	loggerLevel := utils.ReadEnv(jobServiceLoggerLevel)
-	if !utils.IsEmptyStr(loggerLevel) {
-		if c.LoggerConfig == nil {
-			c.LoggerConfig = &LoggerConfig{}
-		}
-		c.LoggerConfig.LogLevel = loggerLevel
-	}
-	archivePeriod := utils.ReadEnv(jobServiceLoggerArchivePeriod)
-	if !utils.IsEmptyStr(archivePeriod) {
-		if period, err := strconv.Atoi(archivePeriod); err == nil {
-			if c.LoggerConfig == nil {
-				c.LoggerConfig = &LoggerConfig{}
-			}
-			c.LoggerConfig.ArchivePeriod = uint(period)
-		}
-	}
-
-	// admin server
-	if adminServer := utils.ReadEnv(jobServiceAdminServerEndpoint); !utils.IsEmptyStr(adminServer) {
-		c.AdminServer = adminServer
-	}
-
 }
 
 // Check if the configurations are valid settings.
@@ -345,25 +303,14 @@ func (c *Configuration) validate() error {
 		}
 	}
 
-	if c.LoggerConfig == nil {
-		return errors.New("missing logger config")
+	// Job service loggers
+	if len(c.LoggerConfigs) == 0 {
+		return errors.New("missing logger config of job service")
 	}
 
-	if !utils.DirExists(c.LoggerConfig.BasePath) {
-		return errors.New("logger path should be an existing dir")
-	}
-
-	validLevels := "DEBUG,INFO,WARNING,ERROR,FATAL"
-	if !strings.Contains(validLevels, c.LoggerConfig.LogLevel) {
-		return fmt.Errorf("logger level can only be one of: %s", validLevels)
-	}
-
-	if c.LoggerConfig.ArchivePeriod == 0 {
-		return fmt.Errorf("logger archive period should be greater than 0")
-	}
-
-	if _, err := url.Parse(c.AdminServer); err != nil {
-		return fmt.Errorf("invalid admin server endpoint: %s", err)
+	// Job loggers
+	if len(c.JobLoggerConfigs) == 0 {
+		return errors.New("missing logger config of job")
 	}
 
 	return nil // valid

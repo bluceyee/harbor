@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ func TestGetConfig(t *testing.T) {
 	if !assert.Equal(200, code, "the status code of getting configurations with admin user should be 200") {
 		return
 	}
-
+	t.Logf("cfg: %+v", cfg)
 	mode := cfg[common.AUTHMode].Value.(string)
 	assert.Equal(common.DBAuth, mode, fmt.Sprintf("the auth mode should be %s", common.DBAuth))
 	ccc, err := config.GetSystemCfg()
@@ -53,6 +53,30 @@ func TestGetConfig(t *testing.T) {
 		t.Logf("failed to get system configurations: %v", err)
 	}
 	t.Logf("%v", ccc)
+}
+
+func TestInternalConfig(t *testing.T) {
+	fmt.Println("Testing internal configurations")
+	assert := assert.New(t)
+	apiTest := newHarborAPI()
+
+	// case 1: get configurations without admin role
+	code, _, err := apiTest.GetInternalConfig(*testUser)
+	if err != nil {
+		t.Fatalf("failed to get configurations: %v", err)
+	}
+
+	assert.Equal(401, code, "the status code of getting configurations with non-admin user should be 401")
+
+	// case 2: get configurations with admin role
+	code, _, err = apiTest.GetInternalConfig(*admin)
+	if err != nil {
+		t.Fatalf("failed to get configurations: %v", err)
+	}
+
+	if !assert.Equal(200, code, "the status code of getting configurations with admin user should be 200") {
+		return
+	}
 }
 
 func TestPutConfig(t *testing.T) {
@@ -72,46 +96,6 @@ func TestPutConfig(t *testing.T) {
 	if !assert.Equal(200, code, "the status code of modifying configurations with admin user should be 200") {
 		return
 	}
-	ccc, err := config.GetSystemCfg()
-	if err != nil {
-		t.Logf("failed to get system configurations: %v", err)
-	}
-	t.Logf("%v", ccc)
-}
-
-func TestResetConfig(t *testing.T) {
-	fmt.Println("Testing resetting configurations")
-	assert := assert.New(t)
-	apiTest := newHarborAPI()
-
-	code, err := apiTest.ResetConfig(*admin)
-	if err != nil {
-		t.Errorf("failed to get configurations: %v", err)
-		return
-	}
-
-	if !assert.Equal(200, code, "unexpected response code") {
-		return
-	}
-
-	code, cfgs, err := apiTest.GetConfig(*admin)
-	if err != nil {
-		t.Errorf("failed to get configurations: %v", err)
-		return
-	}
-
-	if !assert.Equal(200, code, "unexpected response code") {
-		return
-	}
-
-	value, ok := cfgs[common.TokenExpiration]
-	if !ok {
-		t.Errorf("%s not found", common.TokenExpiration)
-		return
-	}
-
-	assert.Equal(int(value.Value.(float64)), 30, "unexpected 30")
-
 	ccc, err := config.GetSystemCfg()
 	if err != nil {
 		t.Logf("failed to get system configurations: %v", err)

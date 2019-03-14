@@ -18,6 +18,7 @@ import { GlobalSearchService } from './global-search.service';
 import { SearchResults } from './search-results';
 import { SearchTriggerService } from './search-trigger.service';
 
+import { AppConfigService } from './../../app-config.service';
 import { MessageHandlerService } from '../../shared/message-handler/message-handler.service';
 
 @Component({
@@ -49,7 +50,8 @@ export class SearchResultComponent implements OnInit, OnDestroy {
     constructor(
         private search: GlobalSearchService,
         private msgHandler: MessageHandlerService,
-        private searchTrigger: SearchTriggerService) { }
+        private searchTrigger: SearchTriggerService,
+        private appConfigService: AppConfigService) { }
 
     ngOnInit() {
         this.searchSub = this.searchTrigger.searchTriggerChan$.subscribe(term => {
@@ -76,7 +78,9 @@ export class SearchResultComponent implements OnInit, OnDestroy {
         if (src) {
             src.project.forEach(pro => res.project.push(Object.assign({}, pro)));
             src.repository.forEach(repo => res.repository.push(Object.assign({}, repo)));
-
+            if (this.withHelmChart) {
+                src.chart.forEach(chart => res.chart.push(JSON.parse(JSON.stringify(chart))));
+            }
             return res;
         }
 
@@ -127,6 +131,9 @@ export class SearchResultComponent implements OnInit, OnDestroy {
         if (term === "") {
             this.searchResults.project = [];
             this.searchResults.repository = [];
+            if (this.withHelmChart) {
+                this.searchResults.chart = [];
+            }
             return;
         }
         // Show spinner
@@ -135,12 +142,15 @@ export class SearchResultComponent implements OnInit, OnDestroy {
         this.search.doSearch(term)
             .then(searchResults => {
                 this.onGoing = false;
-                this.originalCopy = searchResults; // Keeo the original data
+                this.originalCopy = searchResults; // Keep the original data
                 this.searchResults = this.clone(searchResults);
             })
             .catch(error => {
                 this.onGoing = false;
                 this.msgHandler.handleError(error);
             });
+    }
+    get withHelmChart(): boolean {
+        return this.appConfigService.getConfig().with_chartmuseum;
     }
 }

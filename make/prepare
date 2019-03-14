@@ -4,6 +4,7 @@ from __future__ import print_function, unicode_literals # We require Python 2.6 
 from string import Template
 import random
 import os
+from fnmatch import fnmatch
 import sys
 import string
 import argparse
@@ -20,10 +21,14 @@ if sys.version_info[:3][0] == 3:
     import io as StringIO
 
 DATA_VOL = "/data"
+DEFAULT_UID = 10000
+DEFAULT_GID = 10000
 
 base_dir = os.path.dirname(__file__)
 config_dir = os.path.join(base_dir, "common/config")
 templates_dir = os.path.join(base_dir, "common/templates")
+
+custom_nginx_location_file_pattern = 'harbor.https.*.conf'
 
 def validate(conf, args):
 
@@ -70,9 +75,11 @@ def validate(conf, args):
 
 #To meet security requirement
 #By default it will change file mode to 0600, and make the owner of the file to 10000:10000
-def mark_file(path, mode=0o600, uid=10000, gid=10000):
-    os.chmod(path, mode)
-    os.chown(path, uid, gid)
+def mark_file(path, mode=0o600, uid=DEFAULT_UID, gid=DEFAULT_GID):
+    if mode > 0:
+        os.chmod(path, mode)
+    if uid > 0 and gid > 0:
+        os.chown(path, uid, gid)
 
 def get_secret_key(path):
     secret_key = _get_secret(path, "secretkey") 
@@ -107,10 +114,11 @@ def prep_conf_dir(root, *name):
         os.makedirs(absolute_path)
     return absolute_path
 
-def render(src, dest, **kw):
+def render(src, dest, mode=0o640, uid=0, gid=0, **kw):
     t = Template(open(src, 'r').read())
     with open(dest, 'w') as f:
         f.write(t.substitute(**kw))
+    mark_file(dest, mode, uid, gid)
     print("Generated configuration file: %s" % dest)
 
 def delfile(src):
@@ -245,10 +253,6 @@ registry_custom_ca_bundle_path = rcp.get("configuration", "registry_custom_ca_bu
 core_secret = ''.join(random.choice(string.ascii_letters+string.digits) for i in range(16))  
 jobservice_secret = ''.join(random.choice(string.ascii_letters+string.digits) for i in range(16))
 
-adminserver_config_dir = os.path.join(config_dir,"adminserver")
-if not os.path.exists(adminserver_config_dir):
-    os.makedirs(os.path.join(config_dir, "adminserver"))
-
 core_config_dir = prep_conf_dir(config_dir,"core")
 core_certificates_dir =  prep_conf_dir(core_config_dir,"certificates")
 db_config_dir = prep_conf_dir(config_dir, "db")
@@ -259,7 +263,7 @@ nginx_config_dir = prep_conf_dir (config_dir, "nginx")
 nginx_conf_d = prep_conf_dir(nginx_config_dir, "conf.d")
 log_config_dir = prep_conf_dir (config_dir, "log")
 
-adminserver_conf_env = os.path.join(config_dir, "adminserver", "env")
+conf_env = os.path.join(config_dir, "core", "config_env")
 core_conf_env = os.path.join(config_dir, "core", "env")
 core_conf = os.path.join(config_dir, "core", "app.conf")
 core_cert_dir = os.path.join(config_dir, "core", "certificates")
@@ -271,8 +275,7 @@ db_conf_env = os.path.join(config_dir, "db", "env")
 job_conf_env = os.path.join(config_dir, "jobservice", "env")
 nginx_conf = os.path.join(config_dir, "nginx", "nginx.conf")
 cert_dir = os.path.join(config_dir, "nginx", "cert")
-log_rotate_config = os.path.join(config_dir, "log", "logrotate.conf") 
-adminserver_url = "http://adminserver:8080"
+log_rotate_config = os.path.join(config_dir, "log", "logrotate.conf")
 registry_url = "http://registry:5000"
 registry_controller_url = "http://registryctl:8080"
 core_url = "http://core:8080"
@@ -303,15 +306,35 @@ if protocol == "https":
             ssl_cert = os.path.join("/etc/nginx/cert", os.path.basename(target_cert_path)),
             ssl_cert_key = os.path.join("/etc/nginx/cert", os.path.basename(target_cert_key_path)))
 else:
-    render(os.path.join(templates_dir, "nginx", "nginx.http.conf"),
-        nginx_conf)
+    render(os.path.join(templates_dir, "nginx", "nginx.http.conf"), nginx_conf)
+    custom_nginx_location_file_pattern = 'harbor.http.*.conf'
+
+def add_additional_location_config(src, dst):
+    """
+    This conf file is used for user that wanna add additional customized locations to harbor proxy
+    :params src: source of the file
+    :params dst: destination file path
+    """
+    if not os.path.isfile(src):
+        return
+    print("Copying nginx configuration file {src} to {dst}".format(src=src, dst=dst))
+    shutil.copy2(src, dst)
+    mark_file(dst)
+
+nginx_template_ext_dir = os.path.join(templates_dir, 'nginx', 'ext')
+if os.path.exists(nginx_template_ext_dir):
+    map(lambda filename: add_additional_location_config(
+        os.path.join(nginx_template_ext_dir, filename),
+        os.path.join(nginx_conf_d, filename)),
+    [fname for fname in os.listdir(nginx_template_ext_dir) if fnmatch(fname, custom_nginx_location_file_pattern)])
+
 #Use reload_key to avoid reload config after restart harbor
 reload_key = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6)) if reload_config == "true" else ""
 
 ldap_group_admin_dn = rcp.get("configuration", "ldap_group_admin_dn") if rcp.has_option("configuration", "ldap_group_admin_dn") else ""
 
-render(os.path.join(templates_dir, "adminserver", "env"),
-        adminserver_conf_env,
+render(os.path.join(templates_dir, "core", "config_env"),
+        conf_env,
         reload_config=reload_config,
         public_url=public_url,
         core_url=core_url,
@@ -387,7 +410,6 @@ render(os.path.join(templates_dir, "core", "env"),
         redis_host=redis_host,
         redis_port=redis_port,
         redis_password=redis_password,
-        adminserver_url = adminserver_url,
         chart_cache_driver = chart_cache_driver,
         redis_url_reg = redis_url_reg)
 
@@ -412,6 +434,8 @@ for c in storage_provider_config.split(","):
 storage_provider_info = ('\n' + ' ' * 4).join(storage_provider_conf_list)
 render(os.path.join(templates_dir, "registry", registry_config_file),
     registry_conf,
+    uid=DEFAULT_UID, 
+    gid=DEFAULT_GID,
     storage_provider_info=storage_provider_info,
     public_url=public_url,
     core_url=core_url,
@@ -428,15 +452,19 @@ render(os.path.join(templates_dir, "jobservice", "env"),
         job_conf_env,
         core_secret=core_secret,
         jobservice_secret=jobservice_secret,
-        adminserver_url=adminserver_url)
+        core_url=core_url)
 
 render(os.path.join(templates_dir, "jobservice", "config.yml"),
         jobservice_conf,
+        uid=DEFAULT_UID, 
+        gid=DEFAULT_GID,
         max_job_workers=max_job_workers,
         redis_url=redis_url_js)
 
 render(os.path.join(templates_dir, "log", "logrotate.conf"),
         log_rotate_config,
+        uid=DEFAULT_UID, 
+        gid=DEFAULT_GID,
         log_rotate_count=log_rotate_count,
 		log_rotate_size=log_rotate_size)
 
@@ -521,8 +549,8 @@ else:
     shutil.copyfile(os.path.join(templates_dir, "registry", "root.crt"), os.path.join(registry_config_dir, "root.crt"))
 
 if len(registry_custom_ca_bundle_path) > 0 and os.path.isfile(registry_custom_ca_bundle_path):
-    shutil.copyfile(registry_custom_ca_bundle_path, os.path.join(registry_config_dir, "custom-ca-bundle.crt"))
-    print("Copied custom ca bundle: %s" % os.path.join(registry_config_dir, "custom-ca-bundle.crt"))
+    shutil.copyfile(registry_custom_ca_bundle_path, os.path.join(config_dir, "custom-ca-bundle.crt"))
+    print("Copied custom ca bundle: %s" % os.path.join(config_dir, "custom-ca-bundle.crt"))
 
 if args.notary_mode:
     notary_config_dir = prep_conf_dir(config_dir, "notary")
@@ -565,11 +593,16 @@ if args.notary_mode:
     mark_file(os.path.join(notary_config_dir, "notary-signer-ca.crt"))
     mark_file(os.path.join(notary_config_dir, "root.crt"))
     print("Copying notary signer configuration file")
-    #Call render instead of copy so the umask will take effect to mark the file as 0644
     render(os.path.join(notary_temp_dir, "signer-config.postgres.json"), 
-        os.path.join(notary_config_dir, "signer-config.postgres.json"))
+        os.path.join(notary_config_dir, "signer-config.postgres.json"),
+        uid=DEFAULT_UID, 
+        gid=DEFAULT_GID
+        )
+
     render(os.path.join(notary_temp_dir, "server-config.postgres.json"),
         os.path.join(notary_config_dir, "server-config.postgres.json"),
+        uid=DEFAULT_UID, 
+        gid=DEFAULT_GID,
         token_endpoint=public_url)
     print("Copying nginx configuration file for notary")
     shutil.copy2(os.path.join(templates_dir, "nginx", "notary.upstream.conf"), nginx_conf_d)
@@ -594,6 +627,8 @@ if args.clair_mode:
     clair_conf = os.path.join(clair_config_dir, "config.yaml")
     render(os.path.join(clair_temp_dir, "config.yaml"),
             clair_conf,
+            uid=DEFAULT_UID, 
+            gid=DEFAULT_GID,
             password = clair_db_password,
             username = clair_db_username,
             host = clair_db_host,
@@ -620,11 +655,6 @@ if args.chart_mode:
     if not os.path.isdir(chartm_config_dir):
         print ("Create config folder: %s" % chartm_config_dir)
         os.makedirs(chartm_config_dir)
-
-    # handle custom ca bundle
-    if len(registry_custom_ca_bundle_path) > 0 and os.path.isfile(registry_custom_ca_bundle_path):
-        shutil.copyfile(registry_custom_ca_bundle_path, os.path.join(chartm_config_dir, "custom-ca-bundle.crt"))
-        print("Copied custom ca bundle: %s" % os.path.join(chartm_config_dir, "custom-ca-bundle.crt"))
     
     # process redis info
     cache_store = "redis"

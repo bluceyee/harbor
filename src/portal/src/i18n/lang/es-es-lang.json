@@ -4,7 +4,8 @@
         "HARBOR": "Harbor",
         "VIC": "Contenedores Integrados vSphere",
         "MGMT": "Administración",
-        "REG": "Registro"
+        "REG": "Registro",
+        "HARBOR_SWAGGER": "Harbor Swagger"
     },
     "SIGN_IN": {
         "REMEMBER": "Recordarme",
@@ -51,7 +52,7 @@
     },
     "TOOLTIP": {
         "EMAIL": "El email debe ser una dirección válida como nombre@ejemplo.com.",
-        "USER_NAME": "Debe tener una longitud máxima de 20 caracteres y no puede contener caracteres especiales.",
+        "USER_NAME": "Debe tener una longitud máxima de 255 caracteres y no puede contener caracteres especiales.",
         "FULL_NAME": "La longitud máxima debería ser de 20 caracteres.",
         "COMMENT": "La longitud del comentario debería ser menor de 20 caracteres.",
         "CURRENT_PWD": "Es obligatorio introducir la contraseña actual.",
@@ -64,11 +65,14 @@
         "ITEM_REQUIRED": "Campo obligatorio.",
         "NUMBER_REQUIRED": "El campo es obligatorio y debería ser un número.",
         "PORT_REQUIRED": "El campo es obligatorio y debería ser un número de puerto válido.",
+        "CRON_REQUIRED": "El campo es obligatorio y debe estar en formato cron.",        
         "EMAIL_EXISTING": "Esa dirección de email ya existe.",
         "USER_EXISTING": "Ese nombre de usuario ya existe.",
         "RULE_USER_EXISTING": "Name is already in use.",
         "EMPTY": "Name is required",
-        "REPO_TOOLTIP": "Users can not do any operations to the images in this mode."
+        "NONEMPTY": "Can't be empty",
+        "REPO_TOOLTIP": "Users can not do any operations to the images in this mode.",
+        "ENDPOINT_FORMAT": "Endpoint must start with HTTP or HTTPS."
     },
     "PLACEHOLDER": {
         "CURRENT_PWD": "Introduzca la contraseña actual",
@@ -122,7 +126,8 @@
             "REPLICATION": "Replicacións",
             "CONFIG": "Configuración"
         },
-        "LOGS": "Logs"
+        "LOGS": "Logs",
+        "API_EXPLORER": "API EXPLORER"
     },
     "USER": {
         "ADD_ACTION": "New User",
@@ -153,6 +158,7 @@
         "PUBLIC_OR_PRIVATE": "Público",
         "ACCESS_LEVEL": "Nivel de acceso",
         "REPO_COUNT": "Contador de repositorios",
+        "CHART_COUNT": "Chart Count",
         "CREATION_TIME": "Fecha de creación",
         "PUBLIC": "Público",
         "PRIVATE": "Privado",
@@ -178,7 +184,7 @@
         "CREATED_SUCCESS": "Proyecto creado satisfactoriamente.",
         "DELETED_SUCCESS": "Proyecto eliminado satisfactoriamente.",
         "TOGGLED_SUCCESS": "Proyecto alternado satisfactoriamente.",
-        "FAILED_TO_DELETE_PROJECT": "Los proyectos que contienen repositorios o reglas de replicación no pueden eliminarse.",
+        "FAILED_TO_DELETE_PROJECT": "Project contains repositories or replication rules or helm-charts cannot be deleted.",
         "INLINE_HELP_PUBLIC": "Cuando un proyecto se marca como público, todo el mundo tiene permisos de lectura sobre los repositorio de dicho proyecto, y no hace falta hacer \"docker login\" antes de subir imágenes a ellos.",
         "OF": "of"
     },
@@ -189,7 +195,9 @@
         "LOGS": "Logs",
         "LABELS": "Labels",
         "PROJECTS": "Proyectos",
-        "CONFIG": "Configuración"
+        "CONFIG": "Configuración",
+        "HELMCHART": "Helm Charts",
+        "ROBOT_ACCOUNTS": "Robot Accounts"
     },
     "PROJECT_CONFIG": {
         "REGISTRY": "Registro de proyectos",
@@ -213,6 +221,7 @@
         "ROLE": "Rol",
         "SYS_ADMIN": "Administrador del sistema",
         "PROJECT_ADMIN": "Administrador del proyecto",
+        "PROJECT_MASTER": "Mantenedor",
         "DEVELOPER": "Desarrollador",
         "GUEST": "Invitado",
         "DELETE": "Eliminar",
@@ -252,6 +261,34 @@
         "SWITCH_SUMMARY": "Do you want to switch project members {{param}}?",
         "SET_ROLE": "SET ROLE",
         "REMOVE": "Remove"
+    },
+    "ROBOT_ACCOUNT": {
+        "NAME": "Name",
+        "TOKEN": "Token",
+        "NEW_ROBOT_ACCOUNT": "NEW ROBOT ACCOUNT",
+        "ENABLED_STATE": "Enabled state",
+        "EXPIRATION": "Expiration",
+        "NUMBER_REQUIRED":"Field is required and should be an integer other than 0.",
+        "TOKEN_EXPIRATION":"Robot Token Expiration (Days)",
+        "DESCRIPTION": "Description",
+        "ACTION": "Action",
+        "EDIT": "Edit",
+        "ITEMS": "items",
+        "OF": "of",
+        "DISABLE_ACCOUNT": "Disable Account",
+        "ENABLE_ACCOUNT": "Enable Account",
+        "DELETE": "Delete",
+        "CREAT_ROBOT_ACCOUNT": "Creat Robot Account",
+        "PULL_PERMISSION": "Permission for Pull",
+        "PUSH_PERMISSION": "Permission for Push",
+        "FILTER_PLACEHOLDER": "Filter Robot Accounts",
+        "ROBOT_NAME": "Cannot contain special characters(~#$%) and maximum length should be 255 characters.",
+        "ACCOUNT_EXISTING": "Robot Account is already exists.",
+        "ALERT_TEXT": "This is the only time to copy your personal access token.You wont't have another opportunity",
+        "CREATED_SUCCESS": "Created '{{param}}' successfully.",
+        "COPY_SUCCESS": "Copy token successfully of '{{param}}'",
+        "DELETION_TITLE": "Confirm removal of robot accounts",
+        "DELETION_SUMMARY": "Do you want to delete robot accounts {{param}}?"
     },
     "GROUP": {
         "GROUP": "Group",
@@ -378,15 +415,15 @@
         "IMMEDIATE": "Immediate",
         "DAILY": "Daily",
         "WEEKLY": "Weekly",
-        "SETTING":"Options",
-        "TRIGGER":"Triggering Condition",
-        "TARGETS":"Target",
+        "SETTING": "Options",
+        "TRIGGER": "Triggering Condition",
+        "TARGETS": "Target",
         "MODE": "Mode",
         "TRIGGER_MODE": "Trigger Mode",
         "SOURCE_PROJECT": "Source project",
         "REPLICATE": "Replicate",
-        "DELETE_REMOTE_IMAGES":"Delete remote images when locally deleted",
-        "REPLICATE_IMMEDIATE":"Replicate existing images immediately",
+        "DELETE_REMOTE_IMAGES": "Delete remote images when locally deleted",
+        "REPLICATE_IMMEDIATE": "Replicate existing images immediately",
         "NEW": "New",
         "NAME_TOOLTIP": "replication rule name should be at least 2 characters long with lower case characters, numbers and ._- and must be start with characters or numbers.",
         "DELETED_LABEL_INFO": "Deleted label(s) '{{param}}' referenced in the filter, click 'SAVE' to update the filter to enable this rule.",
@@ -440,12 +477,13 @@
         "DELETION_TITLE_TAG": "Confirmación de Eliminación de Etiqueta",
         "DELETION_SUMMARY_TAG": "¿Quiere eliminar la etiqueta {{param}}?",
         "DELETION_TITLE_TAG_DENIED": "La etiqueta firmada no puede ser eliminada",
-        "DELETION_SUMMARY_TAG_DENIED": "La etiqueta debe ser eliminada de la Notaría antes de eliminarla.\nEliminarla de la Notaría con este comando:\n{{param}}",
+        "DELETION_SUMMARY_TAG_DENIED": "La etiqueta debe ser eliminada de la Notaría antes de eliminarla.\nEliminarla de la Notaría con este comando:\n",
         "TAGS_NO_DELETE": "Delete is prohibited in read only mode.",
         "FILTER_FOR_REPOSITORIES": "Filtrar Repositorios",
         "TAG": "Etiqueta",
         "SIZE": "Size",
         "VULNERABILITY": "Vulnerability",
+        "BUILD_HISTORY": "Construir Historia",
         "SIGNED": "Firmada",
         "AUTHOR": "Autor",
         "CREATED": "Fecha de creación",
@@ -467,12 +505,15 @@
         "NO_INFO": "Sin información de descripción para este repositorio",
         "IMAGE": "Imágenes",
         "LABELS": "Labels",
-        "ADD_TO_IMAGE": "Add labels to this image",
+        "ADD_LABEL_TO_IMAGE": "Add labels to this image",
         "FILTER_BY_LABEL": "Filter images by label",
         "ADD_LABELS": "Add labels",
+        "RETAG": "Retag",
         "ACTION": "ACTION",
         "DEPLOY": "DEPLOY",
-        "ADDITIONAL_INFO": "Add Additional Info"
+        "ADDITIONAL_INFO": "Add Additional Info",
+        "REPO_NAME": "Repository",
+        "MARKDOWN": "Styling with Markdown is supported"
     },
     "HELM_CHART": {
         "HELMCHARTS": "Charts",
@@ -489,6 +530,7 @@
         "SRC_REPO": "Source Repository",
         "CREATED": "Created Time",
         "MAINTAINERS": "Maintainers",
+        "OTHER_MAINTAINERS": "{{ name }} and {{ number }} others",
         "PULLS": "Pull Count",
         "VERSION": "Version",
         "APP_VERSION": "Application Version",
@@ -527,6 +569,8 @@
         "PROV_FILE": "Prov File",
         "READY": "Ready",
         "NOT_READY": "Not Ready",
+        "LABELS": "Labels",
+        "ADD_LABEL_TO_CHART_VERSION": "Add labels to this chart version",
         "STATUS": "Status"
     },
     "ALERT": {
@@ -575,6 +619,7 @@
         "AUTH_MODE_DB": "Base de datos",
         "AUTH_MODE_LDAP": "LDAP",
         "AUTH_MODE_UAA": "UAA",
+        "AUTH_MODE_HTTP": "http_auth",
         "SCOPE_BASE": "Base",
         "SCOPE_ONE_LEVEL": "UnNivel",
         "SCOPE_SUBTREE": "Subárbol",
@@ -582,6 +627,7 @@
         "PRO_CREATION_ADMIN": "Solo Administradores",
         "ROOT_CERT": "Registro Certificado Raíz",
         "ROOT_CERT_LINK": "Descargar",
+        "REGISTRY_CERTIFICATE": "Certificado de registro",
         "TOOLTIP": {
             "SELF_REGISTRATION_ENABLE": "Activar registro.",
             "SELF_REGISTRATION_DISABLE": "Disable sign up.",
@@ -592,12 +638,16 @@
             "LDAP_UID": "El atributo usado en una búsqueda para encontrar un usuario. Debe ser el uid, cn, email, sAMAccountName u otro atributo dependiendo del LDAP/AD.",
             "LDAP_SCOPE": "El ámbito de búsqueda para usuarios",
             "TOKEN_EXPIRATION": "El tiempo de expiración (en minutos) del token creado por el servicio de tokens. Por defecto son 30 minutos.",
+            "ROBOT_TOKEN_EXPIRATION": "El tiempo de caducidad (días) del token de la cuenta del robot, el valor predeterminado es 30 días. Muestra el número de días convertidos de minutos y redondeos.",                        
             "PRO_CREATION_RESTRICTION": "Marca para definir qué usuarios tienen permisos para crear proyectos. Por defecto, todos pueden crear proyectos. Seleccione 'Solo Administradores' para que solamente los administradores puedan crear proyectos.",
             "ROOT_CERT_DOWNLOAD": "Download the root certificate of registry.",
             "SCANNING_POLICY": "Set image scanning policy based on different requirements. 'None': No active policy; 'Daily At': Triggering scanning at the specified time everyday.",
             "VERIFY_CERT": "Verify Cert from LDAP Server",
             "READONLY_TOOLTIP": "In read-only mode, you can not delete repositories or tags or push images. ",
-            "GC_POLICY": ""
+            "GC_POLICY": "",
+            "HOURLY_CRON":"Run once an hour, beginning of hour. Equivalente a 0 0 * * * *.",
+            "WEEKLY_CRON":"Run once a week, midnight between Sat/Sun. Equivalente a 0 0 0 * * 0.",
+            "DAILY_CRON":"Run once a day, midnight. Equivalente a 0 0 0 * * *."
 
         },
         "LDAP": {
@@ -625,6 +675,11 @@
             "CLIENT_ID": "UAA Client ID",
             "CLIENT_SECRET": "UAA Client Secret",
             "VERIFY_CERT": "UAA Verify Cert"
+        },
+        "HTTP_AUTH": {
+            "ENDPOINT": "Server Endpoint",
+            "ALWAYS_ONBOARD": "Always Onboard",
+            "VERIFY_CERT": "Authentication Verify Cert"
         },
         "SCANNING": {
             "TRIGGER_SCAN_ALL_SUCCESS": "Trigger scan all successfully!",
@@ -740,6 +795,7 @@
         "DOCKER_VERSION": "Docker Version",
         "ARCHITECTURE": "Architecture",
         "OS": "OS",
+        "OS_VERSION": "OS Version",
         "HAVE": "have",
         "HAS": "has",
         "SCAN_COMPLETION_TIME": "Scan Completed",
@@ -749,7 +805,10 @@
         "COPY_ERROR": "Copy failed, please try to manually copy.",
         "FILTER_FOR_TAGS": "Etiquetas de filtro",
         "AUTHOR": "Author",
-        "LABELS": "Labels"
+        "LABELS": "Labels",
+        "CREATION": "Tiempo de creación",
+        "COMMAND": "Mando"
+
     },
     "LABEL": {
         "LABEL": "Label",
@@ -760,7 +819,7 @@
         "DELETE": "Delete",
         "LABEL_NAME": "Label Name",
         "COLOR": "Color",
-        "FILTER_Label_PLACEHOLDER": "Filter Labels",
+        "FILTER_LABEL_PLACEHOLDER": "Filter Labels",
         "NO_LABELS": "No labels",
         "DELETION_TITLE_TARGET": "Confirm Label Deletion",
         "DELETION_SUMMARY_TARGET": "Do you want to delete {{param}}?",
@@ -768,13 +827,13 @@
         "NAME_ALREADY_EXISTS": "Label name already exists."
     },
     "WEEKLY": {
-    "MONDAY": "Monday",
-    "TUESDAY": "Tuesday",
-    "WEDNESDAY": "Wednesday",
-    "THURSDAY": "Thursday",
-    "FRIDAY": "Friday",
-    "SATURDAY": "Saturday",
-    "SUNDAY": "Sunday"
+        "MONDAY": "Monday",
+        "TUESDAY": "Tuesday",
+        "WEDNESDAY": "Wednesday",
+        "THURSDAY": "Thursday",
+        "FRIDAY": "Friday",
+        "SATURDAY": "Saturday",
+        "SUNDAY": "Sunday"
     },
     "OPERATION": {
         "LOCAL_EVENT": "Local Events",
@@ -785,6 +844,7 @@
         "DELETE_REPO": "Delete repository",
         "DELETE_TAG": "Delete tag",
         "DELETE_USER": "Delete user",
+        "DELETE_ROBOT": "Delete robot",
         "DELETE_REGISTRY": "Delete registry",
         "DELETE_REPLICATION": "Delete replication",
         "DELETE_MEMBER": "Delete user member",
@@ -812,33 +872,41 @@
     "SERVER_ERROR": "No hemos podido llevar a cabo la acción debido a un error interno.",
     "INCONRRECT_OLD_PWD": "La contraseña antigua no es correcta.",
     "UNKNOWN": "n/a",
-    "STATUS":"Status",
+    "STATUS": "Status",
     "START_TIME": "Start Time",
-    "END_TIME": "End Time",
-    "DETAILS":"Details",
-    "PENDING":"Pending",
-    "FINISHED":"Finished",
-    "STOPPED":"Stopped",
-    "RUNNING":"Running",
-    "ERROR":"Error",
+    "UPDATE_TIME": "Update Time",
+    "LOGS": "Logs",
+    "PENDING": "Pending",
+    "FINISHED": "Finished",
+    "STOPPED": "Stopped",
+    "RUNNING": "Running",
+    "ERROR": "Error",
     "SCHEDULE": {
         "NONE": "None",
         "DAILY": "Daily",
         "WEEKLY": "Weekly",
-        "MANUAL": "Manual"
-    }, 
+        "HOURLY": "Hourly",
+        "CUSTOM": "Custom",
+        "MANUAL": "Manual",
+        "CRON": "cron",
+        "ON": "on",
+        "AT": "at"
+    },
     "GC": {
         "CURRENT_SCHEDULE": "Current Schedule",
-        "ON": "on",
-        "AT": "at",
         "GC_NOW": "GC NOW",
-        "JOB_LIST":"GC Jobs List",
-        "JOB_ID":"Job ID",
+        "JOB_HISTORY": "GC Jobs History",
+        "JOB_ID": "Job ID",
         "TRIGGER_TYPE": "Trigger Type",
         "LATEST_JOBS": "Latest {{param}} Jobs",
-        "LOG_DETAIL":"Log Details",
-        "MSG_SUCCESS":"Garbage Collection Successful",
-        "MSG_SCHEDULE_SET":"Garbage Collection schedule has been set",
-        "MSG_SCHEDULE_RESET":"Garbage Collection schedule has been reset"
+        "MSG_SUCCESS": "Garbage Collection Successful",
+        "MSG_SCHEDULE_SET": "Garbage Collection schedule has been set",
+        "MSG_SCHEDULE_RESET": "Garbage Collection schedule has been reset"
+    },
+    "RETAG": {
+        "MSG_SUCCESS": "Retag successfully",
+        "TIP_REPO": "A repository name is broken up into path components. A component of a repository name must be at least one lowercase, alpha-numeric characters, optionally separated by periods, dashes or underscores. More strictly, it must match the regular expression [a-z0-9]+(?:[._-][a-z0-9]+)*.If a repository name has two or more path components, they must be separated by a forward slash ('/').The total length of a repository name, including slashes, must be less the 256 characters.",
+        "TIP_TAG": "A tag is a label applied to a Docker image in a repository. Tags are how various images in a repository are distinguished from each other.It need to match Regex: (`[\\w][\\w.-]{0,127}`)"
     }
+
 }

@@ -13,7 +13,7 @@
 // limitations under the License.
 import { Component, OnInit, ViewChild, Input, Output, EventEmitter } from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
-import { State } from '@clr/angular';
+import { State } from '../service/interface';
 
 import { RepositoryService } from '../service/repository.service';
 import { Repository, RepositoryItem, Tag, TagClickEvent,
@@ -36,6 +36,7 @@ const TabLinkContentMap: {[index: string]: string} = {
 export class RepositoryComponent implements OnInit {
   signedCon: {[key: string]: any | string[]} = {};
   @Input() projectId: number;
+  @Input() memberRoleID: number;
   @Input() repoName: string;
   @Input() hasSignedIn: boolean;
   @Input() hasProjectAdminRole: boolean;

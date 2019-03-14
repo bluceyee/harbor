@@ -15,6 +15,7 @@
 package dao
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -31,6 +32,9 @@ const (
 	// ClairDBAlias ...
 	ClairDBAlias = "clair-db"
 )
+
+// ErrDupRows is returned by DAO when inserting failed with error "duplicate key value violates unique constraint"
+var ErrDupRows = errors.New("sql: duplicate row in DB")
 
 // Database is an interface of different databases
 type Database interface {
@@ -86,6 +90,20 @@ func InitDatabase(database *models.Database) error {
 	return nil
 }
 
+// InitAndUpgradeDatabase - init database and upgrade when required
+func InitAndUpgradeDatabase(database *models.Database) error {
+	if err := InitDatabase(database); err != nil {
+		return err
+	}
+	if err := UpgradeSchema(database); err != nil {
+		return err
+	}
+	if err := CheckSchemaVersion(); err != nil {
+		return err
+	}
+	return nil
+}
+
 // CheckSchemaVersion checks that whether the schema version matches with the expected one
 func CheckSchemaVersion() error {
 	version, err := GetSchemaVersion()
@@ -124,6 +142,12 @@ func GetOrmer() orm.Ormer {
 		globalOrm = orm.NewOrm()
 	})
 	return globalOrm
+}
+
+// isDupRecErr checks if the error is due to a duplication of record, currently this
+// works only for pgSQL
+func isDupRecErr(e error) bool {
+	return strings.Contains(e.Error(), "duplicate key value violates unique constraint")
 }
 
 // ClearTable is the shortcut for test cases, it should be called only in test cases.

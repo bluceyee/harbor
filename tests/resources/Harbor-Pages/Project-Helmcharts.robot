@@ -19,7 +19,7 @@ Upload Chart files
     ${prometheus_file_path}  Set Variable  ${current_dir}/${prometheus_chart_filename}
     Choose File  xpath=${chart_file_browse}  ${prometheus_file_path}
     Click Element  xpath=${upload_action_button}
-    Sleep  2
+    Wait Until Page Does Not Contain Element  xpath=${upload_action_button}
 
     Click Element  xpath=${upload_chart_button}
     ${harbor_file_path}  Set Variable  ${current_dir}/${harbor_chart_filename}
@@ -33,20 +33,25 @@ Upload Chart files
 
 Go Into Chart Version
     [Arguments]  ${chart_name}
-    Click Element  xpath=//hbr-helm-chart//a[contains(., "${chart_name}")]
+    Click Element  xpath=//hbr-helm-chart//a[contains(., '${chart_name}')]
     Capture Page Screenshot  viewchartversion.png
 
 Go Into Chart Detail
     [Arguments]  ${version_name}
-    Click Element  xpath=//hbr-helm-chart-version//a[contains(., "${version_name}")]
+    Click Element  xpath=//hbr-helm-chart-version//a[contains(., '${version_name}')]
     Sleep  2
     Page Should Contain Element  ${chart_detail}
 
 Go Back To Versions And Delete
-    Click Element  xpath=${version_bread_crumbs}
-    Sleep  2
-    Click Element  xpath=${version_checkbox}
-    Click Element  xpath=${version_delete}
-    Click Element  xpath=${version_confirm_delete}
-    Sleep  2
-    Page Should Contain Element  xpath=${helmchart_content}
+    Retry Element Click  xpath=${version_bread_crumbs}
+    Retry Element Click  xpath=${version_checkbox}
+    Retry Element Click  xpath=${version_delete}
+    :For  ${n}  IN RANGE  1  6
+    \    Log To Console  Trying Go Back To Versions And Delete ${n} times ...
+    \    Retry Element Click  xpath=${version_confirm_delete}
+    \    Capture Page Screenshot
+    \    ${out}  Run Keyword And Ignore Error  Retry Wait Until Page Contains Element  xpath=${helmchart_content}
+    \    Capture Page Screenshot
+    \    Log To Console  Return value is ${out[0]}
+    \    Exit For Loop If  '${out[0]}'=='PASS'
+    \    Sleep  1

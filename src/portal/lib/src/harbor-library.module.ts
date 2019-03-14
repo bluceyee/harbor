@@ -20,7 +20,6 @@ import { DATETIME_PICKER_DIRECTIVES } from './datetime-picker/index';
 import { VULNERABILITY_DIRECTIVES } from './vulnerability-scanning/index';
 import { PUSH_IMAGE_BUTTON_DIRECTIVES } from './push-image/index';
 import { CONFIGURATION_DIRECTIVES } from './config/index';
-import { JOB_LOG_VIEWER_DIRECTIVES } from './job-log-viewer/index';
 import { PROJECT_POLICY_CONFIG_DIRECTIVES } from './project-policy-config/index';
 import { HBR_GRIDVIEW_DIRECTIVES } from './gridview/index';
 import { REPOSITORY_GRIDVIEW_DIRECTIVES } from './repository-gridview/index';
@@ -29,6 +28,8 @@ import { LABEL_DIRECTIVES } from "./label/index";
 import { CREATE_EDIT_LABEL_DIRECTIVES } from "./create-edit-label/index";
 import { LABEL_PIECE_DIRECTIVES } from "./label-piece/index";
 import { HELMCHART_DIRECTIVE } from "./helm-chart/index";
+import { IMAGE_NAME_INPUT_DIRECTIVES } from "./image-name-input/index";
+import { CRON_SCHEDULE_DIRECTIVES } from "./cron-schedule/index";
 import {
   SystemInfoService,
   SystemInfoDefaultService,
@@ -53,8 +54,15 @@ import {
   LabelService,
   LabelDefaultService,
   HelmChartService,
-  HelmChartDefaultService
+  HelmChartDefaultService,
+  RetagService,
+  RetagDefaultService,
+  UserPermissionService,
+  UserPermissionDefaultService
 } from './service/index';
+import { GcRepoService } from './config/gc/gc.service';
+import {GcViewModelFactory} from './config/gc/gc.viewmodel.factory';
+import {GcApiRepository, GcApiDefaultRepository} from './config/gc/gc.api.repository';
 import {
   ErrorHandler,
   DefaultErrorHandler
@@ -65,7 +73,7 @@ import { TranslateModule } from '@ngx-translate/core';
 import { TranslateServiceInitializer } from './i18n/index';
 import { DEFAULT_LANG_COOKIE_KEY, DEFAULT_SUPPORTING_LANGS, DEFAULT_LANG } from './utils';
 import { ChannelService } from './channel/index';
-import { OperationService } from  './operation/operation.service';
+import { OperationService } from './operation/operation.service';
 
 /**
  * Declare default service configuration; all the endpoints will be defined in
@@ -94,7 +102,8 @@ export const DefaultServiceConfig: IServiceConfig = {
   scanJobEndpoint: "/api/jobs/scan",
   labelEndpoint: "/api/labels",
   helmChartEndpoint: "/api/chartrepo",
-  downloadChartEndpoint: "/chartrepo"
+  downloadChartEndpoint: "/chartrepo",
+  gcEndpoint: "/api/system/gc"
 };
 
 /**
@@ -128,6 +137,9 @@ export interface HarborModuleConfig {
   // Service implementation for tag
   tagService?: Provider;
 
+  // Service implementation for retag
+  retagService?: Provider;
+
   // Service implementation for vulnerability scanning
   scanningService?: Provider;
 
@@ -145,6 +157,12 @@ export interface HarborModuleConfig {
 
   // Service implementation for helmchart
   helmChartService?: Provider;
+  // Service implementation for userPermission
+  userPermissionService?: Provider;
+
+  // Service implementation for gc
+  gcApiRepository?: Provider;
+
 }
 
 /**
@@ -184,7 +202,6 @@ export function initConfig(translateInitializer: TranslateServiceInitializer, co
     VULNERABILITY_DIRECTIVES,
     PUSH_IMAGE_BUTTON_DIRECTIVES,
     CONFIGURATION_DIRECTIVES,
-    JOB_LOG_VIEWER_DIRECTIVES,
     PROJECT_POLICY_CONFIG_DIRECTIVES,
     LABEL_DIRECTIVES,
     CREATE_EDIT_LABEL_DIRECTIVES,
@@ -192,7 +209,9 @@ export function initConfig(translateInitializer: TranslateServiceInitializer, co
     HBR_GRIDVIEW_DIRECTIVES,
     REPOSITORY_GRIDVIEW_DIRECTIVES,
     OPERATION_DIRECTIVES,
-    HELMCHART_DIRECTIVE
+    HELMCHART_DIRECTIVE,
+    IMAGE_NAME_INPUT_DIRECTIVES,
+    CRON_SCHEDULE_DIRECTIVES
   ],
   exports: [
     LOG_DIRECTIVES,
@@ -210,7 +229,6 @@ export function initConfig(translateInitializer: TranslateServiceInitializer, co
     VULNERABILITY_DIRECTIVES,
     PUSH_IMAGE_BUTTON_DIRECTIVES,
     CONFIGURATION_DIRECTIVES,
-    JOB_LOG_VIEWER_DIRECTIVES,
     TranslateModule,
     PROJECT_POLICY_CONFIG_DIRECTIVES,
     LABEL_DIRECTIVES,
@@ -219,7 +237,9 @@ export function initConfig(translateInitializer: TranslateServiceInitializer, co
     HBR_GRIDVIEW_DIRECTIVES,
     REPOSITORY_GRIDVIEW_DIRECTIVES,
     OPERATION_DIRECTIVES,
-    HELMCHART_DIRECTIVE
+    HELMCHART_DIRECTIVE,
+    IMAGE_NAME_INPUT_DIRECTIVES,
+    CRON_SCHEDULE_DIRECTIVES
   ],
   providers: []
 })
@@ -237,12 +257,15 @@ export class HarborLibraryModule {
         config.replicationService || { provide: ReplicationService, useClass: ReplicationDefaultService },
         config.repositoryService || { provide: RepositoryService, useClass: RepositoryDefaultService },
         config.tagService || { provide: TagService, useClass: TagDefaultService },
+        config.retagService || { provide: RetagService, useClass: RetagDefaultService },
         config.scanningService || { provide: ScanningResultService, useClass: ScanningResultDefaultService },
         config.configService || { provide: ConfigurationService, useClass: ConfigurationDefaultService },
         config.jobLogService || { provide: JobLogService, useClass: JobLogDefaultService },
         config.projectPolicyService || { provide: ProjectService, useClass: ProjectDefaultService },
-        config.labelService || {provide: LabelService, useClass: LabelDefaultService},
-        config.helmChartService || {provide: HelmChartService, useClass: HelmChartDefaultService},
+        config.labelService || { provide: LabelService, useClass: LabelDefaultService },
+        config.helmChartService || { provide: HelmChartService, useClass: HelmChartDefaultService },
+        config.userPermissionService || { provide: UserPermissionService, useClass: UserPermissionDefaultService },
+        config.gcApiRepository || {provide: GcApiRepository, useClass: GcApiDefaultRepository},
         // Do initializing
         TranslateServiceInitializer,
         {
@@ -252,7 +275,9 @@ export class HarborLibraryModule {
           multi: true
         },
         ChannelService,
-        OperationService
+        OperationService,
+        GcRepoService,
+        GcViewModelFactory
       ]
     };
   }
@@ -269,14 +294,19 @@ export class HarborLibraryModule {
         config.replicationService || { provide: ReplicationService, useClass: ReplicationDefaultService },
         config.repositoryService || { provide: RepositoryService, useClass: RepositoryDefaultService },
         config.tagService || { provide: TagService, useClass: TagDefaultService },
+        config.retagService || { provide: RetagService, useClass: RetagDefaultService },
         config.scanningService || { provide: ScanningResultService, useClass: ScanningResultDefaultService },
         config.configService || { provide: ConfigurationService, useClass: ConfigurationDefaultService },
         config.jobLogService || { provide: JobLogService, useClass: JobLogDefaultService },
         config.projectPolicyService || { provide: ProjectService, useClass: ProjectDefaultService },
-        config.labelService || {provide: LabelService, useClass: LabelDefaultService},
-        config.helmChartService || {provide: HelmChartService, useClass: HelmChartDefaultService},
+        config.labelService || { provide: LabelService, useClass: LabelDefaultService },
+        config.helmChartService || { provide: HelmChartService, useClass: HelmChartDefaultService },
+        config.userPermissionService || { provide: UserPermissionService, useClass: UserPermissionDefaultService },
+        config.gcApiRepository || {provide: GcApiRepository, useClass: GcApiDefaultRepository},
         ChannelService,
-        OperationService
+        OperationService,
+        GcRepoService,
+        GcViewModelFactory
       ]
     };
   }

@@ -8,15 +8,18 @@ import { ProjectService, ProjectDefaultService} from '../service/project.service
 import { SERVICE_CONFIG, IServiceConfig} from '../service.config';
 import { SystemInfo } from '../service/interface';
 import { Project } from './project';
-
+import { UserPermissionService, UserPermissionDefaultService } from '../service/permission.service';
+import { USERSTATICPERMISSION } from '../service/permission-static';
+import { of } from 'rxjs';
 describe('ProjectPolicyConfigComponent', () => {
 
   let systemInfoService: SystemInfoService;
   let projectPolicyService: ProjectService;
+  let userPermissionService: UserPermissionService;
 
   let spySystemInfo: jasmine.Spy;
   let spyProjectPolicies: jasmine.Spy;
-
+  let mockHasChangeConfigRole: boolean = true;
   let mockSystemInfo: SystemInfo[] = [
     {
       'with_clair': true,
@@ -44,7 +47,7 @@ describe('ProjectPolicyConfigComponent', () => {
     }
   ];
 
-  let mockPorjectPolicies: Project[] | any[] = [
+  let mockProjectPolicies: Project[] | any[] = [
     {
       'project_id': 1,
       'owner_id': 1,
@@ -102,7 +105,8 @@ describe('ProjectPolicyConfigComponent', () => {
         ErrorHandler,
         { provide: SERVICE_CONFIG, useValue: config },
         { provide: ProjectService, useClass: ProjectDefaultService },
-        { provide: SystemInfoService, useClass: SystemInfoDefaultService}
+        { provide: SystemInfoService, useClass: SystemInfoDefaultService},
+        { provide: UserPermissionService, useClass: UserPermissionDefaultService},
       ]
     })
     .compileComponents();
@@ -118,8 +122,13 @@ describe('ProjectPolicyConfigComponent', () => {
     projectPolicyService = fixture.debugElement.injector.get(ProjectService);
 
     spySystemInfo = spyOn(systemInfoService, 'getSystemInfo').and.returnValues(Promise.resolve(mockSystemInfo[0]));
-    spyProjectPolicies = spyOn(projectPolicyService, 'getProject').and.returnValues(Promise.resolve(mockPorjectPolicies[0]));
+    spyProjectPolicies = spyOn(projectPolicyService, 'getProject').and.returnValues(Promise.resolve(mockProjectPolicies[0]));
 
+    userPermissionService = fixture.debugElement.injector.get(UserPermissionService);
+    spyOn(userPermissionService, "getPermission")
+    .withArgs(component.projectId,
+      USERSTATICPERMISSION.CONFIGURATION.KEY, USERSTATICPERMISSION.CONFIGURATION.VALUE.UPDATE )
+    .and.returnValue(of(mockHasChangeConfigRole));
     fixture.detectChanges();
   });
 

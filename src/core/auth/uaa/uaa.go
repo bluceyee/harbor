@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ func (u *Auth) Authenticate(m models.AuthModel) (*models.User, error) {
 func (u *Auth) OnBoardUser(user *models.User) error {
 	user.Username = strings.TrimSpace(user.Username)
 	if len(user.Username) == 0 {
-		return fmt.Errorf("The Username is empty")
+		return fmt.Errorf("the Username is empty")
 	}
 	if len(user.Password) == 0 {
 		user.Password = "1234567ab"

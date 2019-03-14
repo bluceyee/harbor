@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ func TestTargetsPost(t *testing.T) {
 	apiTest := newHarborAPI()
 
 	endPoint := os.Getenv("REGISTRY_URL")
-	repTargets := &apilib.RepTargetPost{endPoint, addTargetName, adminName, adminPwd}
+	repTargets := &apilib.RepTargetPost{Endpoint: endPoint, Name: addTargetName, Username: adminName, Password: adminPwd}
 
 	fmt.Println("Testing Targets Post API")
 
@@ -195,7 +195,7 @@ func TestTargetsPut(t *testing.T) {
 	apiTest := newHarborAPI()
 
 	endPoint := "1.1.1.1"
-	updateRepTargets := &apilib.RepTargetPost{endPoint, addTargetName, adminName, adminPwd}
+	updateRepTargets := &apilib.RepTargetPost{Endpoint: endPoint, Name: addTargetName, Username: adminName, Password: adminPwd}
 	id := strconv.Itoa(addTargetID)
 
 	fmt.Println("Testing Target Put API")

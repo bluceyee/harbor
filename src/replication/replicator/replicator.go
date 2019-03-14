@@ -30,6 +30,7 @@ import (
 // Replication holds information for a replication
 type Replication struct {
 	PolicyID   int64
+	OpUUID     string
 	Candidates []models.FilterItem
 	Targets    []*common_models.RepTarget
 	Operation  string
@@ -60,6 +61,9 @@ func (d *DefaultReplicator) Replicate(replication *Replication) error {
 	operation := ""
 	for _, candidate := range replication.Candidates {
 		strs := strings.SplitN(candidate.Value, ":", 2)
+		if len(strs) != 2 {
+			return fmt.Errorf("malforld image '%s'", candidate.Value)
+		}
 		repositories[strs[0]] = append(repositories[strs[0]], strs[1])
 		operation = candidate.Operation
 	}
@@ -69,6 +73,7 @@ func (d *DefaultReplicator) Replicate(replication *Replication) error {
 			// create job in database
 			id, err := dao.AddRepJob(common_models.RepJob{
 				PolicyID:   replication.PolicyID,
+				OpUUID:     replication.OpUUID,
 				Repository: repository,
 				TagList:    tags,
 				Operation:  operation,
@@ -89,17 +94,13 @@ func (d *DefaultReplicator) Replicate(replication *Replication) error {
 			}
 
 			if operation == common_models.RepOpTransfer {
-				url, err := config.ExtEndpoint()
-				if err != nil {
-					return err
-				}
 				job.Name = common_job.ImageTransfer
 				job.Parameters = map[string]interface{}{
 					"repository":            repository,
 					"tags":                  tags,
-					"src_registry_url":      url,
-					"src_registry_insecure": true,
-					// "src_token_service_url":"",
+					"src_registry_url":      config.InternalCoreURL(),
+					"src_registry_insecure": false,
+					"src_token_service_url": config.InternalTokenServiceEndpoint(),
 					"dst_registry_url":      target.URL,
 					"dst_registry_insecure": target.Insecure,
 					"dst_registry_username": target.Username,

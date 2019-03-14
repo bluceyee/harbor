@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ import (
 	"github.com/goharbor/harbor/src/common/utils/clair"
 	"github.com/goharbor/harbor/src/common/utils/log"
 	"github.com/goharbor/harbor/src/core/config"
+	"github.com/goharbor/harbor/src/core/systeminfo"
+	"github.com/goharbor/harbor/src/core/systeminfo/imagestorage"
 )
 
 // SystemInfoAPI handle requests for getting system info /api/systeminfo
@@ -96,7 +98,6 @@ type GeneralInfo struct {
 	SelfRegistration            bool                             `json:"self_registration"`
 	HasCARoot                   bool                             `json:"has_ca_root"`
 	HarborVersion               string                           `json:"harbor_version"`
-	NextScanAll                 int64                            `json:"next_scan_all"`
 	ClairVulnStatus             *models.ClairVulnerabilityStatus `json:"clair_vulnerability_status,omitempty"`
 	RegistryStorageProviderName string                           `json:"registry_storage_provider_name"`
 	ReadOnly                    bool                             `json:"read_only"`
@@ -120,7 +121,8 @@ func (sia *SystemInfoAPI) validate() {
 func (sia *SystemInfoAPI) GetVolumeInfo() {
 	sia.validate()
 
-	capacity, err := config.AdminserverClient.Capacity()
+	systeminfo.Init()
+	capacity, err := imagestorage.GlobalDriver.Cap()
 	if err != nil {
 		log.Errorf("failed to get capacity: %v", err)
 		sia.CustomAbort(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
@@ -138,7 +140,6 @@ func (sia *SystemInfoAPI) GetVolumeInfo() {
 
 // GetCert gets default self-signed certificate.
 func (sia *SystemInfoAPI) GetCert() {
-	sia.validate()
 	if _, err := os.Stat(defaultRootCert); err == nil {
 		sia.Ctx.Output.Header("Content-Type", "application/octet-stream")
 		sia.Ctx.Output.Header("Content-Disposition", "attachment; filename=ca.crt")
@@ -184,11 +185,6 @@ func (sia *SystemInfoAPI) GetGeneralInfo() {
 	}
 	if info.WithClair {
 		info.ClairVulnStatus = getClairVulnStatus()
-		t := utils.ScanAllMarker().Next().UTC().Unix()
-		if t < 0 {
-			t = 0
-		}
-		info.NextScanAll = t
 	}
 	sia.Data["json"] = info
 	sia.ServeJSON()

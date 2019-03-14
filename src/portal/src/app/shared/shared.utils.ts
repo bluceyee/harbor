@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 import { NgForm } from '@angular/forms';
-import {RequestOptions, Headers} from "@angular/http";
-import { Comparator, State } from '@clr/angular';
+import {RequestOptions, Headers, Response} from "@angular/http";
+import { Comparator, State } from '../../../lib/src/service/interface';
 import {RequestQueryParams} from "@harbor/ui";
 
 import { MessageService } from '../global-message/message.service';
@@ -26,6 +26,9 @@ import { httpStatusCode, AlertType } from './shared.const';
  * returns {string}
  */
 export const errorHandler = function (error: any): string {
+    if (typeof error === "string") {
+        return error;
+    }
     if (error && error._body) {
         // treat as string message
         if (typeof error._body === "string") {
@@ -301,3 +304,10 @@ export function doSorting<T extends { [key: string]: any | any[] }>(items: T[], 
         return comp;
     });
 }
+
+export const extractJson = (res: Response) => {
+    if (res.text() === '') {
+        return [];
+    }
+    return (res.json() || []);
+};

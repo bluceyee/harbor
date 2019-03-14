@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -125,6 +125,7 @@ func (b *BaseController) WriteYamlData(object interface{}) {
 
 // Init related objects/configurations for the API controllers
 func Init() error {
+	registerHealthCheckers()
 	// If chart repository is not enabled then directly return
 	if !config.WithChartMuseum() {
 		return nil

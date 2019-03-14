@@ -1,4 +1,4 @@
-// Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+// Copyright 2018 Project Harbor Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -310,6 +310,41 @@ func TestRepPolicyAPIPost(t *testing.T) {
 			},
 			code:     http.StatusCreated,
 			postFunc: postFunc,
+		},
+		// 409
+		{
+			request: &testingRequest{
+				method: http.MethodPost,
+				url:    repPolicyAPIBasePath,
+				bodyJSON: &api_models.ReplicationPolicy{
+					Name: policyName,
+					Projects: []*models.Project{
+						{
+							ProjectID: projectID,
+						},
+					},
+					Targets: []*models.RepTarget{
+						{
+							ID: targetID,
+						},
+					},
+					Filters: []rep_models.Filter{
+						{
+							Kind:    replication.FilterItemKindRepository,
+							Pattern: "*",
+						},
+						{
+							Kind:  replication.FilterItemKindLabel,
+							Value: labelID2,
+						},
+					},
+					Trigger: &rep_models.Trigger{
+						Kind: replication.TriggerKindManual,
+					},
+				},
+				credential: sysAdmin,
+			},
+			code: http.StatusConflict,
 		},
 	}
 

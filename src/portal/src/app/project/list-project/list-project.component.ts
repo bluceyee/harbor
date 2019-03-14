@@ -22,7 +22,7 @@ import {
 } from "@angular/core";
 import { Router } from "@angular/router";
 
-import { Comparator, State } from "@clr/angular";
+import { Comparator, State } from "../../../../lib/src/service/interface";
 import {TranslateService} from "@ngx-translate/core";
 
 import { RoleInfo, ConfirmationTargets, ConfirmationState, ConfirmationButtons } from "../../shared/shared.const";
@@ -56,6 +56,7 @@ export class ListProjectComponent implements OnDestroy {
 
     roleInfo = RoleInfo;
     repoCountComparator: Comparator<Project> = new CustomComparator<Project>("repo_count", "number");
+    chartCountComparator: Comparator<Project> = new CustomComparator<Project>("chart_count", "number");
     timeComparator: Comparator<Project> = new CustomComparator<Project>("creation_time", "date");
     accessLevelComparator: Comparator<Project> = new CustomComparator<Project>("public", "string");
     roleComparator: Comparator<Project> = new CustomComparator<Project>("current_user_role_id", "number");
@@ -106,16 +107,25 @@ export class ListProjectComponent implements OnDestroy {
         return false;
     }
 
+    get withChartMuseum(): boolean {
+        if (this.appConfigService.getConfig().with_chartmuseum) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     public get isSystemAdmin(): boolean {
         let account = this.session.getCurrentUser();
         return account != null && account.has_admin_role;
     }
 
     public get canDelete(): boolean {
-        if (this.projects.length) {
-           return this.projects.some((pro: Project) => pro.current_user_role_id === 1);
+        if (!this.selectedRow.length) {
+            return false;
         }
-        return false;
+
+        return this.isSystemAdmin || this.selectedRow.every((pro: Project) => pro.current_user_role_id === 1);
     }
 
     ngOnDestroy(): void {

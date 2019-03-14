@@ -13,7 +13,7 @@
 // limitations under the License.
 import { Injectable } from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
-import { ErrorHandler } from '@harbor/ui';
+import { ErrorHandler, UserPermissionService } from '@harbor/ui';
 
 import { MessageService } from '../../global-message/message.service';
 import { AlertType, httpStatusCode } from '../../shared/shared.const';
@@ -27,6 +27,7 @@ export class MessageHandlerService implements ErrorHandler {
     constructor(
         private msgService: MessageService,
         private translate: TranslateService,
+        private userPermissionService: UserPermissionService,
         private session: SessionService) { }
 
     // Handle the error and map it to the suitable message
@@ -44,8 +45,9 @@ export class MessageHandlerService implements ErrorHandler {
             let code = error.statusCode || error.status;
             if (code === httpStatusCode.Unauthorized) {
                 this.msgService.announceAppLevelMessage(code, msg, AlertType.DANGER);
-                // Session is invalida now, clare session cache
+                // Session is invalid now, clare session cache
                 this.session.clear();
+                this.userPermissionService.clearPermissionCache();
             } else {
                 this.msgService.announceMessage(code, msg, AlertType.DANGER);
             }

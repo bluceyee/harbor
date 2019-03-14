@@ -9,21 +9,25 @@ import {
   EventEmitter
 } from "@angular/core";
 import { Observable, forkJoin } from "rxjs";
-import {finalize, map} from "rxjs/operators";
+import { finalize, map } from "rxjs/operators";
 
 import { TranslateService } from "@ngx-translate/core";
-import { State } from "@clr/angular";
+import { State } from "../../service/interface";
 
 import {
   SystemInfo,
   SystemInfoService,
   HelmChartVersion,
-  HelmChartMaintainer
+  HelmChartMaintainer,
+  LabelService
 } from "./../../service/index";
+import { Label } from './../../service/interface';
 import { ErrorHandler } from "./../../error-handler/error-handler";
 import { toPromise, DEFAULT_PAGE_SIZE, downloadFile } from "../../utils";
 import { OperationService } from "./../../operation/operation.service";
 import { HelmChartService } from "./../../service/helm-chart.service";
+import { UserPermissionService } from "../../service/permission.service";
+import { USERSTATICPERMISSION } from "../../service/permission-static";
 import { ConfirmationAcknowledgement, ConfirmationDialogComponent, ConfirmationMessage } from "./../../confirmation-dialog";
 import {
   OperateInfo,
@@ -34,7 +38,9 @@ import {
   ConfirmationButtons,
   ConfirmationTargets,
   ConfirmationState,
-  DefaultHelmIcon
+  DefaultHelmIcon,
+  ResourceType,
+  Roles
 } from "../../shared/shared.const";
 
 @Component({
@@ -45,11 +51,11 @@ import {
 })
 export class ChartVersionComponent implements OnInit {
   signedCon: { [key: string]: any | string[] } = {};
+  @Input() projectId: number;
   @Input() projectName: string;
   @Input() chartName: string;
   @Input() roleName: string;
   @Input() hasSignedIn: boolean;
-  @Input() hasProjectAdminRole: boolean;
   @Input() chartDefaultIcon: string = DefaultHelmIcon;
   @Output() versionClickEvt = new EventEmitter<string>();
   @Output() backEvt = new EventEmitter<any>();
@@ -57,10 +63,11 @@ export class ChartVersionComponent implements OnInit {
 
   lastFilteredVersionName: string;
   chartVersions: HelmChartVersion[] = [];
-  versionsCopy: HelmChartVersion[] = [];
   systemInfo: SystemInfo;
   selectedRows: HelmChartVersion[] = [];
+  labels: Label[] = [];
   loading = true;
+  resourceType = ResourceType.CHART_VERSION;
 
   isCardView: boolean;
   cardHover = false;
@@ -74,17 +81,22 @@ export class ChartVersionComponent implements OnInit {
   chartFile: File;
   provFile: File;
 
+  addLabelHeaders = 'HELM_CHART.ADD_LABEL_TO_CHART_VERSION';
+
   @ViewChild("confirmationDialog")
   confirmationDialog: ConfirmationDialogComponent;
-
+  hasAddRemoveHelmChartVersionPermission: boolean;
+  hasDownloadHelmChartVersionPermission: boolean;
+  hasDeleteHelmChartVersionPermission: boolean;
   constructor(
     private errorHandler: ErrorHandler,
-    private translateService: TranslateService,
     private systemInfoService: SystemInfoService,
     private helmChartService: HelmChartService,
+    private resrouceLabelService: LabelService,
+    public userPermissionService: UserPermissionService,
     private cdr: ChangeDetectorRef,
     private operationService: OperationService,
-  ) {}
+  ) { }
 
   public get registryUrl(): string {
     return this.systemInfo ? this.systemInfo.registry_url : "";
@@ -96,7 +108,9 @@ export class ChartVersionComponent implements OnInit {
       .then(systemInfo => (this.systemInfo = systemInfo))
       .catch(error => this.errorHandler.error(error));
     this.refresh();
+    this.getLabels();
     this.lastFilteredVersionName = "";
+    this.getHelmChartVersionPermission(this.projectId);
   }
 
   updateFilterValue(value: string) {
@@ -104,11 +118,20 @@ export class ChartVersionComponent implements OnInit {
     this.refresh();
   }
 
+  getLabels() {
+    forkJoin(this.resrouceLabelService.getLabels("g"), this.resrouceLabelService.getProjectLabels(this.projectId))
+      .subscribe(
+        (labels) => {
+          this.labels = [].concat(...labels);
+        });
+  }
+
   refresh() {
     this.loading = true;
     this.helmChartService
       .getChartVersions(this.projectName, this.chartName)
       .pipe(finalize(() => {
+        this.selectedRows = [];
         this.loading = false;
         let hnd = setInterval(() => this.cdr.markForCheck(), 100);
         setTimeout(() => clearInterval(hnd), 2000);
@@ -116,7 +139,6 @@ export class ChartVersionComponent implements OnInit {
       .subscribe(
         versions => {
           this.chartVersions = versions.filter(x => x.version.includes(this.lastFilteredVersionName));
-          this.versionsCopy = versions.map(x => Object.assign({}, x));
           this.totalCount = versions.length;
         },
         err => {
@@ -296,5 +318,31 @@ export class ChartVersionComponent implements OnInit {
     } else {
       return "HELM_CHART.ACTIVE";
     }
+  }
+
+  onLabelChange(version: HelmChartVersion) {
+    this.resrouceLabelService.getChartVersionLabels(this.projectName, this.chartName, version.version)
+      .subscribe(labels => {
+        let versionIdx = this.chartVersions.findIndex(v => v.name === version.name);
+        this.chartVersions[versionIdx].labels = labels;
+        let hnd = setInterval(() => this.cdr.markForCheck(), 200);
+        setTimeout(() => clearInterval(hnd), 5000);
+      });
+  }
+
+  getHelmChartVersionPermission(projectId: number): void {
+
+    let hasAddRemoveHelmChartVersionPermission = this.userPermissionService.getPermission(projectId,
+      USERSTATICPERMISSION.HELM_CHART_VERSION_LABEL.KEY, USERSTATICPERMISSION.HELM_CHART_VERSION_LABEL.VALUE.CREATE);
+    let hasDownloadHelmChartVersionPermission = this.userPermissionService.getPermission(projectId,
+      USERSTATICPERMISSION.HELM_CHART_VERSION.KEY, USERSTATICPERMISSION.HELM_CHART_VERSION.VALUE.READ);
+    let hasDeleteHelmChartVersionPermission = this.userPermissionService.getPermission(projectId,
+      USERSTATICPERMISSION.HELM_CHART_VERSION.KEY, USERSTATICPERMISSION.HELM_CHART_VERSION.VALUE.DELETE);
+    forkJoin(hasAddRemoveHelmChartVersionPermission, hasDownloadHelmChartVersionPermission, hasDeleteHelmChartVersionPermission)
+    .subscribe(permissions => {
+      this.hasAddRemoveHelmChartVersionPermission = permissions[0] as boolean;
+      this.hasDownloadHelmChartVersionPermission = permissions[1] as boolean;
+      this.hasDeleteHelmChartVersionPermission = permissions[2] as boolean;
+    }, error => this.errorHandler.error(error));
   }
 }
